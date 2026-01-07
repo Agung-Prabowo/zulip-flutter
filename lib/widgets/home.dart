@@ -391,7 +391,7 @@ class _MainMenu extends StatelessWidget {
       const _SettingsButton(),
       // TODO(#661): Notifications
       // const SizedBox(height: 8),
-      const _AboutZulipButton(),
+      // const _AboutZulipButton(),
       // TODO(#1095): VersionInfo
     ];
 

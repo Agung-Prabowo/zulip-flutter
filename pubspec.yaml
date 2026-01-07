@@ -121,6 +121,7 @@ flutter:
     - assets/Pygments/LICENSE.txt
     - assets/Source_Code_Pro/LICENSE.md
     - assets/Source_Sans_3/LICENSE.md
+    - assets/app-icons/logo-ug.png
 
   fonts:
     # KaTeX's custom fonts.
