@@ -1,6 +1,4 @@
 PODS:
-  - app_settings (5.1.1):
-    - FlutterMacOS
   - device_info_plus (0.0.1):
     - FlutterMacOS
   - file_picker (0.0.1):
@@ -115,7 +113,6 @@ PODS:
     - FlutterMacOS
 
 DEPENDENCIES:
-  - app_settings (from `Flutter/ephemeral/.symlinks/plugins/app_settings/macos`)
   - device_info_plus (from `Flutter/ephemeral/.symlinks/plugins/device_info_plus/macos`)
   - file_picker (from `Flutter/ephemeral/.symlinks/plugins/file_picker/macos`)
   - file_selector_macos (from `Flutter/ephemeral/.symlinks/plugins/file_selector_macos/macos`)
@@ -144,8 +141,6 @@ SPEC REPOS:
     - sqlite3
 
 EXTERNAL SOURCES:
-  app_settings:
-    :path: Flutter/ephemeral/.symlinks/plugins/app_settings/macos
   device_info_plus:
     :path: Flutter/ephemeral/.symlinks/plugins/device_info_plus/macos
   file_picker:
@@ -174,7 +169,6 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral/.symlinks/plugins/wakelock_plus/macos
 
 SPEC CHECKSUMS:
-  app_settings: 140be3a9c0fc1f681e44afe9f549ab037b3aa3a2
   device_info_plus: 1b14eed9bf95428983aed283a8d51cce3d8c4215
   file_picker: e716a70a9fe5fd9e09ebc922d7541464289443af
   file_selector_macos: 3e56eaea051180007b900eacb006686fd54da150
