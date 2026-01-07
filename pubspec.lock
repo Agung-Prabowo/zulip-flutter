@@ -26,7 +26,7 @@ packages:
     source: hosted
     version: "9.0.0"
   app_settings:
-    dependency: "direct main"
+    dependency: "direct overridden"
     description:
       name: app_settings
       sha256: "3e46c561441e5820d3a25339bf8b51b9e45a5f686873851a20c257a530917795"

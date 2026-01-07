@@ -35,7 +35,6 @@ dependencies:
              # https://github.com/dart-lang/i18n/issues/759#issuecomment-1864316701
              # https://github.com/flutter/flutter/issues/117163
 
-  app_settings: ^6.1.1
   collection: ^1.17.2
   convert: ^3.1.1
   crypto: ^3.0.3
@@ -69,6 +68,7 @@ dependencies:
   # Keep list sorted when adding dependencies; it helps prevent merge conflicts.
 
 dependency_overrides:
+  app_settings: 6.1.1
   # TODO(#918) remove this and `flutter_color_models` when `flutter_color_models` accommodates
   #   wide-gamut adjustments to Flutter's `Color`. A PR to `flutter_color_models` is already open:
   #     https://github.com/james-alex/color_models/pull/10
