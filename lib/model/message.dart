@@ -17,12 +17,16 @@ import 'message_list.dart';
 import 'realm.dart';
 import 'store.dart';
 
-const _apiSendMessage = sendMessage; // Bit ugly; for alternatives, see: https://chat.zulip.org/#narrow/stream/243-mobile-team/topic/flutter.3A.20PerAccountStore.20methods/near/1545809
+const _apiSendMessage =
+    sendMessage; // Bit ugly; for alternatives, see: https://chat.zulip.org/#narrow/stream/243-mobile-team/topic/flutter.3A.20PerAccountStore.20methods/near/1545809
 
 /// The portion of [PerAccountStore] for messages and message lists.
 mixin MessageStore on ChannelStore {
   /// All known messages, indexed by [Message.id].
   Map<int, Message> get messages;
+
+  /// All starred messages, as message IDs.
+  Set<int> get starredMessages;
 
   /// [OutboxMessage]s sent by the user, indexed by [OutboxMessage.localMessageId].
   Map<int, OutboxMessage> get outboxMessages;
@@ -86,7 +90,9 @@ mixin MessageStore on ChannelStore {
   ///
   /// Should only be called when there is a failed request,
   /// per [getEditMessageErrorStatus].
-  ({String originalRawContent, String newContent}) takeFailedMessageEdit(int messageId);
+  ({String originalRawContent, String newContent}) takeFailedMessageEdit(
+    int messageId,
+  );
 
   /// Whether the user has permission to delete a message, as of [atDate].
   ///
@@ -115,14 +121,20 @@ mixin MessageStore on ChannelStore {
       return false;
     }
 
-    if (selfHasPermissionForGroupSetting(realmCanDeleteAnyMessageGroup,
-          GroupSettingType.realm, 'can_delete_any_message_group')) {
+    if (selfHasPermissionForGroupSetting(
+      realmCanDeleteAnyMessageGroup,
+      GroupSettingType.realm,
+      'can_delete_any_message_group',
+    )) {
       return true;
     }
 
     if (channel != null) {
-      if (selfHasPermissionForGroupSetting(channel.canDeleteAnyMessageGroup,
-            GroupSettingType.stream, 'can_delete_any_message_group')) {
+      if (selfHasPermissionForGroupSetting(
+        channel.canDeleteAnyMessageGroup,
+        GroupSettingType.stream,
+        'can_delete_any_message_group',
+      )) {
         return true;
       }
     }
@@ -130,10 +142,8 @@ mixin MessageStore on ChannelStore {
     final sender = getUser(message.senderId);
     if (sender == null) return false;
 
-    if (!(
-      sender.userId == selfUserId
-      || (sender.isBot && sender.botOwnerId == selfUserId)
-    )) {
+    if (!(sender.userId == selfUserId ||
+        (sender.isBot && sender.botOwnerId == selfUserId))) {
       return false;
     }
 
@@ -145,15 +155,21 @@ mixin MessageStore on ChannelStore {
     // fallback logic for this specific permission; it's dynamic and depends on
     // realmDeleteOwnMessagePolicy, so we do our own null check here.)
     if (realmCanDeleteOwnMessageGroup != null) {
-      if (!selfHasPermissionForGroupSetting(realmCanDeleteOwnMessageGroup!,
-            GroupSettingType.realm, 'can_delete_own_message_group')) {
+      if (!selfHasPermissionForGroupSetting(
+        realmCanDeleteOwnMessageGroup!,
+        GroupSettingType.realm,
+        'can_delete_own_message_group',
+      )) {
         if (channel == null) {
           // i.e. this is a DM
           return false;
         }
 
-        if (!selfHasPermissionForGroupSetting(channel.canDeleteOwnMessageGroup,
-              GroupSettingType.stream, 'can_delete_own_message_group')) {
+        if (!selfHasPermissionForGroupSetting(
+          channel.canDeleteOwnMessageGroup,
+          GroupSettingType.stream,
+          'can_delete_own_message_group',
+        )) {
           return false;
         }
       }
@@ -170,11 +186,14 @@ mixin MessageStore on ChannelStore {
       // i.e., no limit
       return true;
     }
-    return atDate.millisecondsSinceEpoch ~/ 1000 - message.timestamp
-      <= realmMessageContentDeleteLimitSeconds!;
+    return atDate.millisecondsSinceEpoch ~/ 1000 - message.timestamp <=
+        realmMessageContentDeleteLimitSeconds!;
   }
 
-  bool _selfPassesLegacyDeleteMessagePolicy(int messageId, {required DateTime atDate}) {
+  bool _selfPassesLegacyDeleteMessagePolicy(
+    int messageId, {
+    required DateTime atDate,
+  }) {
     assert(realmDeleteOwnMessagePolicy != null);
     final role = selfUser.role;
 
@@ -186,13 +205,14 @@ mixin MessageStore on ChannelStore {
         return true;
       case RealmDeleteOwnMessagePolicy.members:
         return role.isAtLeast(UserRole.member);
-      case RealmDeleteOwnMessagePolicy.fullMembers: {
-        if (!role.isAtLeast(UserRole.member)) return false;
-        if (role == UserRole.member) {
-          return selfHasPassedWaitingPeriod(byDate: atDate);
+      case RealmDeleteOwnMessagePolicy.fullMembers:
+        {
+          if (!role.isAtLeast(UserRole.member)) return false;
+          if (role == UserRole.member) {
+            return selfHasPassedWaitingPeriod(byDate: atDate);
+          }
+          return true;
         }
-        return true;
-      }
       case RealmDeleteOwnMessagePolicy.moderators:
         return role.isAtLeast(UserRole.moderator);
       case RealmDeleteOwnMessagePolicy.admins:
@@ -208,44 +228,58 @@ mixin ProxyMessageStore on MessageStore {
   @override
   Map<int, Message> get messages => messageStore.messages;
   @override
+  Set<int> get starredMessages => messageStore.starredMessages;
+  @override
   Map<int, OutboxMessage> get outboxMessages => messageStore.outboxMessages;
   @override
   void registerMessageList(MessageListView view) =>
-    messageStore.registerMessageList(view);
+      messageStore.registerMessageList(view);
   @override
   void unregisterMessageList(MessageListView view) =>
-    messageStore.unregisterMessageList(view);
+      messageStore.unregisterMessageList(view);
   @override
   void markReadFromScroll(Iterable<int> messageIds) =>
-    messageStore.markReadFromScroll(messageIds);
+      messageStore.markReadFromScroll(messageIds);
   @override
-  Future<void> sendMessage({required MessageDestination destination, required String content}) {
+  Future<void> sendMessage({
+    required MessageDestination destination,
+    required String content,
+  }) {
     return messageStore.sendMessage(destination: destination, content: content);
   }
+
   @override
   OutboxMessage takeOutboxMessage(int localMessageId) =>
-    messageStore.takeOutboxMessage(localMessageId);
+      messageStore.takeOutboxMessage(localMessageId);
 
   @override
   bool? getEditMessageErrorStatus(int messageId) {
     return messageStore.getEditMessageErrorStatus(messageId);
   }
+
   @override
   Future<void> editMessage({
     required int messageId,
     required String originalRawContent,
     required String newContent,
   }) {
-    return messageStore.editMessage(messageId: messageId,
-      originalRawContent: originalRawContent, newContent: newContent);
+    return messageStore.editMessage(
+      messageId: messageId,
+      originalRawContent: originalRawContent,
+      newContent: newContent,
+    );
   }
+
   @override
-  ({String originalRawContent, String newContent}) takeFailedMessageEdit(int messageId) {
+  ({String originalRawContent, String newContent}) takeFailedMessageEdit(
+    int messageId,
+  ) {
     return messageStore.takeFailedMessageEdit(messageId);
   }
 
   @override
-  Set<MessageListView> get debugMessageListViews => messageStore.debugMessageListViews;
+  Set<MessageListView> get debugMessageListViews =>
+      messageStore.debugMessageListViews;
 }
 
 class _EditMessageRequestStatus {
@@ -260,14 +294,19 @@ class _EditMessageRequestStatus {
   final String newContent;
 }
 
-class MessageStoreImpl extends HasChannelStore with MessageStore, _OutboxMessageStore {
-  MessageStoreImpl({required super.channels})
-    : // There are no messages in InitialSnapshot, so we don't have
-      // a use case for initializing MessageStore with nonempty [messages].
-      messages = {};
+class MessageStoreImpl extends HasChannelStore
+    with MessageStore, _OutboxMessageStore {
+  MessageStoreImpl({
+    required super.channels,
+    required List<int> initialStarredMessages,
+  }) : messages = {},
+       starredMessages = Set.of(initialStarredMessages);
 
   @override
   final Map<int, Message> messages;
+
+  @override
+  final Set<int> starredMessages;
 
   @override
   final Set<MessageListView> _messageListViews = {};
@@ -345,10 +384,12 @@ class MessageStoreImpl extends HasChannelStore with MessageStore, _OutboxMessage
     // TODO(#1581) mark as read locally for latency compensation
     //   (in Unreads and on the message objects)
     try {
-      await updateMessageFlags(connection,
+      await updateMessageFlags(
+        connection,
         messages: toSend,
         op: UpdateMessageFlagsOp.add,
-        flag: MessageFlag.read);
+        flag: MessageFlag.read,
+      );
     } on ApiRequestException {
       // TODO(#1581) un-mark as read locally?
       return false;
@@ -395,13 +436,18 @@ class MessageStoreImpl extends HasChannelStore with MessageStore, _OutboxMessage
   }
 
   @override
-  Future<void> sendMessage({required MessageDestination destination, required String content}) {
+  Future<void> sendMessage({
+    required MessageDestination destination,
+    required String content,
+  }) {
     assert(!_disposed);
     if (!debugOutboxEnable) {
-      return _apiSendMessage(connection,
+      return _apiSendMessage(
+        connection,
         destination: destination,
         content: content,
-        readBySender: true);
+        readBySender: true,
+      );
     }
     return _outboxSendMessage(destination: destination, content: content);
   }
@@ -410,17 +456,27 @@ class MessageStoreImpl extends HasChannelStore with MessageStore, _OutboxMessage
     assert(!_disposed);
     for (int i = 0; i < messages.length; i++) {
       final message = messages[i];
-      messages[i] = this.messages.update(message.id,
+
+      // TODO(#649) update Unreads, if [Unreads.oldUnreadsMissing]
+      // TODO(#650) update RecentDmConversationsView
+
+      // It's tempting to update [starredMessages] based on fetched messages,
+      // like Unreads and RecentDmConversationsView.
+      // But we don't need to: per the API doc, InitialSnapshot.starredMessages
+      // is the complete list of starred message IDs. So we can maintain it
+      // using just the event system, avoiding the fetch/event race
+      // as a cause of inaccuracies.
+
+      messages[i] = this.messages.update(
+        message.id,
         ifAbsent: () => _reconcileUnrecognizedMessage(message),
-        (current) => _reconcileRecognizedMessage(current, message));
+        (current) => _reconcileRecognizedMessage(current, message),
+      );
     }
   }
 
   Message _reconcileUnrecognizedMessage(Message incoming) {
-    if (
-      incoming is StreamMessage
-      && subscriptions[incoming.streamId] == null
-    ) {
+    if (incoming is StreamMessage && subscriptions[incoming.streamId] == null) {
       // The message is in an unsubscribed channel. It might grow stale;
       // add it to _maybeStaleChannelMessages.
       _maybeStaleChannelMessages.add(incoming.id);
@@ -511,15 +567,23 @@ class MessageStoreImpl extends HasChannelStore with MessageStore, _OutboxMessage
     }
 
     _editMessageRequests[messageId] = _EditMessageRequestStatus(
-      hasError: false, originalRawContent: originalRawContent, newContent: newContent);
+      hasError: false,
+      originalRawContent: originalRawContent,
+      newContent: newContent,
+    );
     _notifyMessageListViewsForOneMessage(messageId);
     try {
-      await updateMessage(connection,
+      await updateMessage(
+        connection,
         messageId: messageId,
         content: newContent,
-        prevContentSha256: sha256.convert(utf8.encode(originalRawContent)).toString());
+        prevContentSha256: sha256
+            .convert(utf8.encode(originalRawContent))
+            .toString(),
+      );
       // On success, we'll clear the status from _editMessageRequests
-      // when we get the event.
+      // when we get the event (or below, if in an unsubscribed channel).
+      if (_disposed) return;
     } catch (e) {
       // TODO(log) if e is something unexpected
 
@@ -536,10 +600,25 @@ class MessageStoreImpl extends HasChannelStore with MessageStore, _OutboxMessage
       _notifyMessageListViewsForOneMessage(messageId);
       rethrow;
     }
+
+    final message = messages[messageId];
+    if (message is StreamMessage && subscriptions[message.streamId] == null) {
+      // The message is in an unsubscribed channel.
+      // We don't expect an event (see "third buggy behavior" in #1798)
+      // but we know the edit request succeeded, so, clear the pending-edit state.
+      // We simultaneously reload the affected message lists from scratch, so
+      // the user won't see a state where the edit appears to be forgotten.
+      // (See _EditMessageBannerTrailing._handleTapSave in
+      // lib/widgets/compose_box.dart.)
+      _editMessageRequests.remove(messageId);
+      _notifyMessageListViewsForOneMessage(messageId);
+    }
   }
 
   @override
-  ({String originalRawContent, String newContent}) takeFailedMessageEdit(int messageId) {
+  ({String originalRawContent, String newContent}) takeFailedMessageEdit(
+    int messageId,
+  ) {
     assert(!_disposed);
     final status = _editMessageRequests.remove(messageId);
     _notifyMessageListViewsForOneMessage(messageId);
@@ -551,7 +630,7 @@ class MessageStoreImpl extends HasChannelStore with MessageStore, _OutboxMessage
     }
     return (
       originalRawContent: status.originalRawContent,
-      newContent: status.newContent
+      newContent: status.newContent,
     );
   }
 
@@ -572,8 +651,11 @@ class MessageStoreImpl extends HasChannelStore with MessageStore, _OutboxMessage
 
     // Linear in [messages].
     final affectedKnownMessageIds = messages.values
-      .where((message) => message is StreamMessage && channelIds.contains(message.streamId))
-      .map((message) => message.id);
+        .where(
+          (message) =>
+              message is StreamMessage && channelIds.contains(message.streamId),
+        )
+        .map((message) => message.id);
 
     _maybeStaleChannelMessages.addAll(affectedKnownMessageIds);
   }
@@ -592,6 +674,14 @@ class MessageStoreImpl extends HasChannelStore with MessageStore, _OutboxMessage
 
   void handleMessageEvent(MessageEvent event) {
     final message = event.message;
+
+    if (message.flags.contains(MessageFlag.starred)) {
+      // TODO(log)
+      // It would be surprising if a newly-sent message could be starred.
+      // (I notice that the send-message endpoint doesn't offer a way to
+      // set the starred flag.)
+      // If it turns out to be possible, we should update [starredMessages].
+    }
 
     // If the message is one we already know about (from a fetch),
     // clobber it with the one from the event system.
@@ -612,7 +702,10 @@ class MessageStoreImpl extends HasChannelStore with MessageStore, _OutboxMessage
   }
 
   void handleUpdateMessageEvent(UpdateMessageEvent event) {
-    assert(event.messageIds.contains(event.messageId), "See https://github.com/zulip/zulip-flutter/pull/753#discussion_r1649463633");
+    assert(
+      event.messageIds.contains(event.messageId),
+      "See https://github.com/zulip/zulip-flutter/pull/753#discussion_r1649463633",
+    );
     _handleUpdateMessageEventTimestamp(event);
     _handleUpdateMessageEventContent(event);
     _handleUpdateMessageEventMove(event);
@@ -651,8 +744,10 @@ class MessageStoreImpl extends HasChannelStore with MessageStore, _OutboxMessage
       _editMessageRequests.remove(message.id);
     }
     if (event.renderedContent != null) {
-      assert(message.contentType == 'text/html',
-        "Message contentType was ${message.contentType}; expected text/html.");
+      assert(
+        message.contentType == 'text/html',
+        "Message contentType was ${message.contentType}; expected text/html.",
+      );
       message.content = event.renderedContent!;
     }
     if (event.isMeMessage != null) {
@@ -672,17 +767,24 @@ class MessageStoreImpl extends HasChannelStore with MessageStore, _OutboxMessage
     }
 
     final UpdateMessageMoveData(
-      :origStreamId, :newStreamId, :origTopic, :newTopic) = messageMove;
+      :origStreamId,
+      :newStreamId,
+      :origTopic,
+      :newTopic,
+    ) = messageMove;
 
-    final wasResolveOrUnresolve = newStreamId == origStreamId
-      && MessageEditState.topicMoveWasResolveOrUnresolve(origTopic, newTopic);
+    final wasResolveOrUnresolve =
+        newStreamId == origStreamId &&
+        MessageEditState.topicMoveWasResolveOrUnresolve(origTopic, newTopic);
 
     for (final messageId in event.messageIds) {
       final message = messages[messageId];
       if (message == null) continue;
 
       if (message is! StreamMessage) {
-        assert(debugLog('Bad UpdateMessageEvent: stream/topic move on a DM')); // TODO(log)
+        assert(
+          debugLog('Bad UpdateMessageEvent: stream/topic move on a DM'),
+        ); // TODO(log)
         continue;
       }
 
@@ -703,8 +805,8 @@ class MessageStoreImpl extends HasChannelStore with MessageStore, _OutboxMessage
         message.conversation.topic = newTopic;
       }
 
-      if (!wasResolveOrUnresolve
-          && message.editState == MessageEditState.none) {
+      if (!wasResolveOrUnresolve &&
+          message.editState == MessageEditState.none) {
         message.editState = MessageEditState.moved;
       }
     }
@@ -712,24 +814,34 @@ class MessageStoreImpl extends HasChannelStore with MessageStore, _OutboxMessage
     // TODO predict outbox message moves using propagateMode
 
     for (final view in _messageListViews) {
-      view.messagesMoved(messageMove: messageMove, messageIds: event.messageIds);
+      view.messagesMoved(
+        messageMove: messageMove,
+        messageIds: event.messageIds,
+      );
     }
   }
 
-  void handleDeleteMessageEvent(DeleteMessageEvent event) {
+  /// Handle a [DeleteMessageEvent]
+  /// and return true if the [PerAccountStore] should notify listeners.
+  bool handleDeleteMessageEvent(DeleteMessageEvent event) {
+    bool perAccountStoreShouldNotify = false;
     for (final messageId in event.messageIds) {
       messages.remove(messageId);
+      perAccountStoreShouldNotify |= starredMessages.remove(messageId);
       _maybeStaleChannelMessages.remove(messageId);
       _editMessageRequests.remove(messageId);
     }
     for (final view in _messageListViews) {
       view.handleDeleteMessageEvent(event);
     }
+    return perAccountStoreShouldNotify;
   }
 
-  void handleUpdateMessageFlagsEvent(UpdateMessageFlagsEvent event) {
+  /// Handle an [UpdateMessageFlagsEvent]
+  /// and return true if the [PerAccountStore] should notify listeners.
+  bool handleUpdateMessageFlagsEvent(UpdateMessageFlagsEvent event) {
     final isAdd = switch (event) {
-      UpdateMessageFlagsAddEvent()    => true,
+      UpdateMessageFlagsAddEvent() => true,
       UpdateMessageFlagsRemoveEvent() => false,
     };
 
@@ -750,8 +862,8 @@ class MessageStoreImpl extends HasChannelStore with MessageStore, _OutboxMessage
         anyMessageFound = true;
 
         isAdd
-          ? message.flags.add(event.flag)
-          : message.flags.remove(event.flag);
+            ? message.flags.add(event.flag)
+            : message.flags.remove(event.flag);
       }
       if (anyMessageFound) {
         // TODO(#818): Support MentionsNarrow live-updates when handling
@@ -765,6 +877,15 @@ class MessageStoreImpl extends HasChannelStore with MessageStore, _OutboxMessage
         _notifyMessageListViews(event.messages);
       }
     }
+
+    if (event.flag == MessageFlag.starred) {
+      isAdd
+          ? starredMessages.addAll(event.messages)
+          : starredMessages.removeAll(event.messages);
+      return true;
+    }
+
+    return false;
   }
 
   void handleReactionEvent(ReactionEvent event) {
@@ -773,14 +894,17 @@ class MessageStoreImpl extends HasChannelStore with MessageStore, _OutboxMessage
 
     switch (event.op) {
       case ReactionOp.add:
-        (message.reactions ??= Reactions([])).add(Reaction(
-          emojiName: event.emojiName,
-          emojiCode: event.emojiCode,
-          reactionType: event.reactionType,
-          userId: event.userId,
-        ));
+        (message.reactions ??= Reactions([])).add(
+          Reaction(
+            emojiName: event.emojiName,
+            emojiCode: event.emojiCode,
+            reactionType: event.reactionType,
+            userId: event.userId,
+          ),
+        );
       case ReactionOp.remove:
-        if (message.reactions == null) { // TODO(log)
+        if (message.reactions == null) {
+          // TODO(log)
           return;
         }
         message.reactions!.remove(
@@ -798,7 +922,9 @@ class MessageStoreImpl extends HasChannelStore with MessageStore, _OutboxMessage
 
     final poll = message.poll;
     if (poll == null) {
-      assert(debugLog('Missing poll for submessage event:\n${jsonEncode(event)}')); // TODO(log)
+      assert(
+        debugLog('Missing poll for submessage event:\n${jsonEncode(event)}'),
+      ); // TODO(log)
       return;
     }
 
@@ -819,6 +945,7 @@ class MessageStoreImpl extends HasChannelStore with MessageStore, _OutboxMessage
     }());
     return result;
   }
+
   static bool _debugOutboxEnable = true;
   static set debugOutboxEnable(bool value) {
     assert(() {
@@ -864,13 +991,17 @@ class _MarkReadOnScrollQueue {
 /// The duration an outbox message stays hidden to the user.
 ///
 /// See [OutboxMessageState.waiting].
-const kLocalEchoDebounceDuration = Duration(milliseconds: 500);  // TODO(#1441) find the right value for this
+const kLocalEchoDebounceDuration = Duration(
+  milliseconds: 500,
+); // TODO(#1441) find the right value for this
 
 /// The duration before an outbox message can be restored for resending, since
 /// its creation.
 ///
 /// See [OutboxMessageState.waitPeriodExpired].
-const kSendMessageOfferRestoreWaitPeriod = Duration(seconds: 10);  // TODO(#1441) find the right value for this
+const kSendMessageOfferRestoreWaitPeriod = Duration(
+  seconds: 10,
+); // TODO(#1441) find the right value for this
 
 /// States of an [OutboxMessage] since its creation from a
 /// [MessageStore.sendMessage] call and before its eventual deletion.
@@ -888,13 +1019,18 @@ const kSendMessageOfferRestoreWaitPeriod = Duration(seconds: 10);  // TODO(#1441
 ///         timed out.   not finished when
 ///                      wait period timed out.
 ///
-///              Event received.
-/// (any state) ─────────────────► (delete)
+///              Event received.  Or [sendMessage]
+///              request succeeds and we're sending to
+///              an unsubscribed channel.
+/// (any state) ───────────────────────────────────────► (delete)
 /// ```
 ///
 /// During its lifecycle, it is guaranteed that the outbox message is deleted
 /// as soon a message event with a matching [MessageEvent.localMessageId]
 /// arrives.
+/// If we're sending to an unsubscribed channel, we don't expect an event
+/// (see "third buggy behavior" in #1798) so in that case
+/// the outbox message is deleted when the [sendMessage] request succeeds.
 enum OutboxMessageState {
   /// The [sendMessage] HTTP request has started but the resulting
   /// [MessageEvent] hasn't arrived, and nor has the request failed.  In this
@@ -947,7 +1083,8 @@ sealed class OutboxMessage<T extends Conversation> extends MessageBase<T> {
 
   // TODO(dart): This has to be a plain static method, because factories/constructors
   //   do not support type parameters: https://github.com/dart-lang/language/issues/647
-  static OutboxMessage fromConversation(Conversation conversation, {
+  static OutboxMessage fromConversation(
+    Conversation conversation, {
     required int localMessageId,
     required int selfUserId,
     required int timestamp,
@@ -959,13 +1096,15 @@ sealed class OutboxMessage<T extends Conversation> extends MessageBase<T> {
         selfUserId: selfUserId,
         timestamp: timestamp,
         conversation: conversation,
-        contentMarkdown: contentMarkdown),
+        contentMarkdown: contentMarkdown,
+      ),
       DmConversation() => DmOutboxMessage._(
         localMessageId: localMessageId,
         selfUserId: selfUserId,
         timestamp: timestamp,
         conversation: conversation,
-        contentMarkdown: contentMarkdown),
+        contentMarkdown: contentMarkdown,
+      ),
     };
   }
 
@@ -1019,7 +1158,7 @@ class DmOutboxMessage extends OutboxMessage<DmConversation> {
 /// Manages the outbox messages portion of [MessageStore].
 mixin _OutboxMessageStore on HasChannelStore {
   late final UnmodifiableMapView<int, OutboxMessage> outboxMessages =
-    UnmodifiableMapView(_outboxMessages);
+      UnmodifiableMapView(_outboxMessages);
   final Map<int, OutboxMessage> _outboxMessages = {};
 
   /// A map of timers to show outbox messages after a delay,
@@ -1052,28 +1191,30 @@ mixin _OutboxMessageStore on HasChannelStore {
   /// and notify listeners if necessary.
   ///
   /// The outbox message with [localMessageId] must exist.
-  void _updateOutboxMessage(int localMessageId, {
+  void _updateOutboxMessage(
+    int localMessageId, {
     required OutboxMessageState newState,
   }) {
     assert(!_disposed);
     final outboxMessage = outboxMessages[localMessageId];
     if (outboxMessage == null) {
       throw StateError(
-        'Removing unknown outbox message with localMessageId: $localMessageId');
+        'Removing unknown outbox message with localMessageId: $localMessageId',
+      );
     }
     final oldState = outboxMessage.state;
     // See [OutboxMessageState] for valid state transitions.
     final isStateTransitionValid = switch (newState) {
       OutboxMessageState.hidden => false,
       OutboxMessageState.waiting =>
-        oldState == OutboxMessageState.hidden
-        || oldState == OutboxMessageState.waitPeriodExpired,
+        oldState == OutboxMessageState.hidden ||
+            oldState == OutboxMessageState.waitPeriodExpired,
       OutboxMessageState.waitPeriodExpired =>
         oldState == OutboxMessageState.waiting,
       OutboxMessageState.failed =>
-        oldState == OutboxMessageState.hidden
-        || oldState == OutboxMessageState.waiting
-        || oldState == OutboxMessageState.waitPeriodExpired,
+        oldState == OutboxMessageState.hidden ||
+            oldState == OutboxMessageState.waiting ||
+            oldState == OutboxMessageState.waitPeriodExpired,
     };
     if (!isStateTransitionValid) {
       throw StateError('Unexpected state transition: $oldState -> $newState');
@@ -1099,11 +1240,11 @@ mixin _OutboxMessageStore on HasChannelStore {
     assert(!outboxMessages.containsKey(localMessageId));
 
     final conversation = switch (destination) {
-      StreamDestination(:final streamId, :final topic) =>
-        StreamConversation(
-          streamId,
-          _processTopicLikeServer(topic),
-          displayRecipient: null),
+      StreamDestination(:final streamId, :final topic) => StreamConversation(
+        streamId,
+        _processTopicLikeServer(topic),
+        displayRecipient: null,
+      ),
       DmDestination(:final userIds) => DmConversation(allRecipientIds: userIds),
     };
 
@@ -1112,23 +1253,28 @@ mixin _OutboxMessageStore on HasChannelStore {
       localMessageId: localMessageId,
       selfUserId: selfUserId,
       timestamp: ZulipBinding.instance.utcNow().millisecondsSinceEpoch ~/ 1000,
-      contentMarkdown: content);
+      contentMarkdown: content,
+    );
 
     _outboxMessageDebounceTimers[localMessageId] = Timer(
       kLocalEchoDebounceDuration,
-      () => _handleOutboxDebounce(localMessageId));
+      () => _handleOutboxDebounce(localMessageId),
+    );
 
     _outboxMessageWaitPeriodTimers[localMessageId] = Timer(
       kSendMessageOfferRestoreWaitPeriod,
-      () => _handleOutboxWaitPeriodExpired(localMessageId));
+      () => _handleOutboxWaitPeriodExpired(localMessageId),
+    );
 
     try {
-      await _apiSendMessage(connection,
+      await _apiSendMessage(
+        connection,
         destination: destination,
         content: content,
         readBySender: true,
         queueId: queueId,
-        localId: localMessageId.toString());
+        localId: localMessageId.toString(),
+      );
     } catch (e) {
       if (_disposed) return;
       if (!_outboxMessages.containsKey(localMessageId)) {
@@ -1147,17 +1293,37 @@ mixin _OutboxMessageStore on HasChannelStore {
       // The message event already arrived; nothing to do.
       return;
     }
+
+    if (destination is StreamDestination &&
+        subscriptions[destination.streamId] == null) {
+      // We don't expect an event (we're sending to an unsubscribed channel);
+      // clear the loading spinner.
+      // We simultaneously reload the affected message lists from scratch, so
+      // the user won't see a state where the message appears to have vanished.
+      // (See _SendButtonState._send in lib/widgets/compose_box.dart.)
+      _outboxMessages.remove(localMessageId);
+      _outboxMessageDebounceTimers.remove(localMessageId)?.cancel();
+      _outboxMessageWaitPeriodTimers.remove(localMessageId)?.cancel();
+      for (final view in _messageListViews) {
+        view.notifyListenersIfOutboxMessagePresent(localMessageId);
+      }
+      return;
+    }
+
     // The send request succeeded, so the message was definitely sent.
     // Cancel the timer that would have had us start presuming that the
     // send might have failed.
     _outboxMessageWaitPeriodTimers.remove(localMessageId)?.cancel();
-    if (_outboxMessages[localMessageId]!.state
-          == OutboxMessageState.waitPeriodExpired) {
+    if (_outboxMessages[localMessageId]!.state ==
+        OutboxMessageState.waitPeriodExpired) {
       // The user was offered to restore the message since the request did not
       // complete for a while.  Since the request was successful, we expect the
       // message event to arrive eventually.  Stop inviting the the user to
       // retry, to avoid double-sends.
-      _updateOutboxMessage(localMessageId, newState: OutboxMessageState.waiting);
+      _updateOutboxMessage(
+        localMessageId,
+        newState: OutboxMessageState.waiting,
+      );
     }
   }
 
@@ -1181,20 +1347,29 @@ mixin _OutboxMessageStore on HasChannelStore {
 
   void _handleOutboxDebounce(int localMessageId) {
     assert(!_disposed);
-    assert(outboxMessages.containsKey(localMessageId),
-      'The timer should have been canceled when the outbox message was removed.');
+    assert(
+      outboxMessages.containsKey(localMessageId),
+      'The timer should have been canceled when the outbox message was removed.',
+    );
     _outboxMessageDebounceTimers.remove(localMessageId);
     _updateOutboxMessage(localMessageId, newState: OutboxMessageState.waiting);
   }
 
   void _handleOutboxWaitPeriodExpired(int localMessageId) {
     assert(!_disposed);
-    assert(outboxMessages.containsKey(localMessageId),
-      'The timer should have been canceled when the outbox message was removed.');
-    assert(!_outboxMessageDebounceTimers.containsKey(localMessageId),
-      'The debounce timer should have been removed before the wait period timer expires.');
+    assert(
+      outboxMessages.containsKey(localMessageId),
+      'The timer should have been canceled when the outbox message was removed.',
+    );
+    assert(
+      !_outboxMessageDebounceTimers.containsKey(localMessageId),
+      'The debounce timer should have been removed before the wait period timer expires.',
+    );
     _outboxMessageWaitPeriodTimers.remove(localMessageId);
-    _updateOutboxMessage(localMessageId, newState: OutboxMessageState.waitPeriodExpired);
+    _updateOutboxMessage(
+      localMessageId,
+      newState: OutboxMessageState.waitPeriodExpired,
+    );
   }
 
   OutboxMessage takeOutboxMessage(int localMessageId) {
@@ -1204,12 +1379,14 @@ mixin _OutboxMessageStore on HasChannelStore {
     _outboxMessageWaitPeriodTimers.remove(localMessageId)?.cancel();
     if (removed == null) {
       throw StateError(
-        'Removing unknown outbox message with localMessageId: $localMessageId');
+        'Removing unknown outbox message with localMessageId: $localMessageId',
+      );
     }
-    if (removed.state != OutboxMessageState.failed
-        && removed.state != OutboxMessageState.waitPeriodExpired
-    ) {
-      throw StateError('Unexpected state when restoring draft: ${removed.state}');
+    if (removed.state != OutboxMessageState.failed &&
+        removed.state != OutboxMessageState.waitPeriodExpired) {
+      throw StateError(
+        'Unexpected state when restoring draft: ${removed.state}',
+      );
     }
     for (final view in _messageListViews) {
       view.removeOutboxMessage(removed);

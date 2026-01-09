@@ -7,27 +7,27 @@ import 'dart:typed_data' show Float64List, Int32List, Int64List, Uint8List;
 
 import 'package:flutter/foundation.dart' show ReadBuffer, WriteBuffer;
 import 'package:flutter/services.dart';
+
 bool _deepEquals(Object? a, Object? b) {
   if (a is List && b is List) {
     return a.length == b.length &&
-        a.indexed
-        .every(((int, dynamic) item) => _deepEquals(item.$2, b[item.$1]));
+        a.indexed.every(
+          ((int, dynamic) item) => _deepEquals(item.$2, b[item.$1]),
+        );
   }
   if (a is Map && b is Map) {
-    return a.length == b.length && a.entries.every((MapEntry<Object?, Object?> entry) =>
-        (b as Map<Object?, Object?>).containsKey(entry.key) &&
-        _deepEquals(entry.value, b[entry.key]));
+    return a.length == b.length &&
+        a.entries.every(
+          (MapEntry<Object?, Object?> entry) =>
+              (b as Map<Object?, Object?>).containsKey(entry.key) &&
+              _deepEquals(entry.value, b[entry.key]),
+        );
   }
   return a == b;
 }
 
-
 class IntentSharedFile {
-  IntentSharedFile({
-    this.name,
-    this.mimeType,
-    required this.bytes,
-  });
+  IntentSharedFile({this.name, this.mimeType, required this.bytes});
 
   String? name;
 
@@ -36,15 +36,12 @@ class IntentSharedFile {
   Uint8List bytes;
 
   List<Object?> _toList() {
-    return <Object?>[
-      name,
-      mimeType,
-      bytes,
-    ];
+    return <Object?>[name, mimeType, bytes];
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static IntentSharedFile decode(Object result) {
     result as List<Object?>;
@@ -69,12 +66,10 @@ class IntentSharedFile {
 
   @override
   // ignore: avoid_equals_and_hash_code_on_mutable_classes
-  int get hashCode => Object.hashAll(_toList())
-;
+  int get hashCode => Object.hashAll(_toList());
 }
 
-sealed class AndroidIntentEvent {
-}
+sealed class AndroidIntentEvent {}
 
 class AndroidIntentSendEvent extends AndroidIntentEvent {
   AndroidIntentSendEvent({
@@ -90,15 +85,12 @@ class AndroidIntentSendEvent extends AndroidIntentEvent {
   List<IntentSharedFile>? extraStream;
 
   List<Object?> _toList() {
-    return <Object?>[
-      action,
-      extraText,
-      extraStream,
-    ];
+    return <Object?>[action, extraText, extraStream];
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static AndroidIntentSendEvent decode(Object result) {
     result as List<Object?>;
@@ -123,10 +115,8 @@ class AndroidIntentSendEvent extends AndroidIntentEvent {
 
   @override
   // ignore: avoid_equals_and_hash_code_on_mutable_classes
-  int get hashCode => Object.hashAll(_toList())
-;
+  int get hashCode => Object.hashAll(_toList());
 }
-
 
 class _PigeonCodec extends StandardMessageCodec {
   const _PigeonCodec();
@@ -135,10 +125,10 @@ class _PigeonCodec extends StandardMessageCodec {
     if (value is int) {
       buffer.putUint8(4);
       buffer.putInt64(value);
-    }    else if (value is IntentSharedFile) {
+    } else if (value is IntentSharedFile) {
       buffer.putUint8(129);
       writeValue(buffer, value.encode());
-    }    else if (value is AndroidIntentSendEvent) {
+    } else if (value is AndroidIntentSendEvent) {
       buffer.putUint8(130);
       writeValue(buffer, value.encode());
     } else {
@@ -149,9 +139,9 @@ class _PigeonCodec extends StandardMessageCodec {
   @override
   Object? readValueOfType(int type, ReadBuffer buffer) {
     switch (type) {
-      case 129: 
+      case 129:
         return IntentSharedFile.decode(readValue(buffer)!);
-      case 130: 
+      case 130:
         return AndroidIntentSendEvent.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
@@ -159,16 +149,21 @@ class _PigeonCodec extends StandardMessageCodec {
   }
 }
 
-const StandardMethodCodec pigeonMethodCodec = StandardMethodCodec(_PigeonCodec());
+const StandardMethodCodec pigeonMethodCodec = StandardMethodCodec(
+  _PigeonCodec(),
+);
 
-Stream<AndroidIntentEvent> androidIntentEvents( {String instanceName = ''}) {
+Stream<AndroidIntentEvent> androidIntentEvents({String instanceName = ''}) {
   if (instanceName.isNotEmpty) {
     instanceName = '.$instanceName';
   }
-  final EventChannel androidIntentEventsChannel =
-      EventChannel('dev.flutter.pigeon.zulip.AndroidIntentsEventChannelApi.androidIntentEvents$instanceName', pigeonMethodCodec);
-  return androidIntentEventsChannel.receiveBroadcastStream().map((dynamic event) {
+  final EventChannel androidIntentEventsChannel = EventChannel(
+    'dev.flutter.pigeon.zulip.AndroidIntentsEventChannelApi.androidIntentEvents$instanceName',
+    pigeonMethodCodec,
+  );
+  return androidIntentEventsChannel.receiveBroadcastStream().map((
+    dynamic event,
+  ) {
     return event as AndroidIntentEvent;
   });
 }
-    

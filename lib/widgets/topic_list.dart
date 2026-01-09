@@ -4,6 +4,7 @@ import '../api/model/model.dart';
 import '../api/route/channels.dart';
 import '../generated/l10n/zulip_localizations.dart';
 import '../model/narrow.dart';
+import '../model/topics.dart';
 import '../model/unreads.dart';
 import 'action_sheet.dart';
 import 'app_bar.dart';
@@ -14,7 +15,7 @@ import 'page.dart';
 import 'store.dart';
 import 'text.dart';
 import 'theme.dart';
-import 'unread_count_badge.dart';
+import 'counter_badge.dart';
 
 class TopicListPage extends StatelessWidget {
   const TopicListPage({super.key, required this.streamId});
@@ -27,7 +28,8 @@ class TopicListPage extends StatelessWidget {
   }) {
     return MaterialAccountWidgetRoute(
       context: context,
-      page: TopicListPage(streamId: streamId));
+      page: TopicListPage(streamId: streamId),
+    );
   }
 
   @override
@@ -35,22 +37,35 @@ class TopicListPage extends StatelessWidget {
     final store = PerAccountStoreWidget.of(context);
     final zulipLocalizations = ZulipLocalizations.of(context);
     final appBarBackgroundColor = colorSwatchFor(
-      context, store.subscriptions[streamId]).barBackground;
+      context,
+      store.subscriptions[streamId],
+    ).barBackground;
 
-    return PageRoot(child: Scaffold(
-      appBar: ZulipAppBar(
-        backgroundColor: appBarBackgroundColor,
-        buildTitle: (willCenterTitle) =>
-          _TopicListAppBarTitle(streamId: streamId, willCenterTitle: willCenterTitle),
-        actions: [
-          IconButton(
-            icon: const Icon(ZulipIcons.message_feed),
-            tooltip: zulipLocalizations.channelFeedButtonTooltip,
-            onPressed: () => Navigator.push(context,
-              MessageListPage.buildRoute(context: context,
-                narrow: ChannelNarrow(streamId)))),
-        ]),
-      body: _TopicList(streamId: streamId)));
+    return PageRoot(
+      child: Scaffold(
+        appBar: ZulipAppBar(
+          backgroundColor: appBarBackgroundColor,
+          buildTitle: (willCenterTitle) => _TopicListAppBarTitle(
+            streamId: streamId,
+            willCenterTitle: willCenterTitle,
+          ),
+          actions: [
+            IconButton(
+              icon: const Icon(ZulipIcons.message_feed),
+              tooltip: zulipLocalizations.channelFeedButtonTooltip,
+              onPressed: () => Navigator.push(
+                context,
+                MessageListPage.buildRoute(
+                  context: context,
+                  narrow: ChannelNarrow(streamId),
+                ),
+              ),
+            ),
+          ],
+        ),
+        body: _TopicList(streamId: streamId),
+      ),
+    );
   }
 }
 
@@ -70,8 +85,10 @@ class _TopicListAppBarTitle extends StatelessWidget {
     final designVariables = DesignVariables.of(context);
     final store = PerAccountStoreWidget.of(context);
     final stream = store.streams[streamId];
-    final channelIconColor = colorSwatchFor(context,
-      store.subscriptions[streamId]).iconOnBarBackground;
+    final channelIconColor = colorSwatchFor(
+      context,
+      store.subscriptions[streamId],
+    ).iconOnBarBackground;
 
     // A null [Icon.icon] makes a blank space.
     final icon = stream != null ? iconDataForStream(stream) : null;
@@ -82,35 +99,44 @@ class _TopicListAppBarTitle extends StatelessWidget {
       //     https://github.com/zulip/zulip-flutter/pull/219#discussion_r1281024746
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Padding(padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 6),
-          child: Icon(size: 18, icon, color: channelIconColor)),
-        Flexible(child: Text(
-          stream?.name ?? zulipLocalizations.unknownChannelName,
-          style: TextStyle(
-            fontSize: 20,
-            height: 30 / 20,
-            color: designVariables.title,
-          ).merge(weightVariableTextStyle(context, wght: 600)))),
-      ]);
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 6),
+          child: Icon(size: 18, icon, color: channelIconColor),
+        ),
+        Flexible(
+          child: Text(
+            stream?.name ?? zulipLocalizations.unknownChannelName,
+            style: TextStyle(
+              fontSize: 20,
+              height: 30 / 20,
+              color: designVariables.title,
+            ).merge(weightVariableTextStyle(context, wght: 600)),
+          ),
+        ),
+      ],
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final alignment = willCenterTitle
-      ? Alignment.center
-      : AlignmentDirectional.centerStart;
+        ? Alignment.center
+        : AlignmentDirectional.centerStart;
     return SizedBox(
       width: double.infinity,
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
         onLongPress: () {
-          showChannelActionSheet(context,
+          showChannelActionSheet(
+            context,
             channelId: streamId,
             // We're already on the topic list.
-            showTopicListButton: false);
+            showTopicListButton: false,
+          );
         },
-        child: Align(alignment: alignment,
-          child: _buildStreamRow(context))));
+        child: Align(alignment: alignment, child: _buildStreamRow(context)),
+      ),
+    );
   }
 }
 
@@ -123,81 +149,74 @@ class _TopicList extends StatefulWidget {
   State<_TopicList> createState() => _TopicListState();
 }
 
-class _TopicListState extends State<_TopicList> with PerAccountStoreAwareStateMixin {
+class _TopicListState extends State<_TopicList>
+    with PerAccountStoreAwareStateMixin {
+  Topics? topicsModel;
   Unreads? unreadsModel;
-  // TODO(#1499): store the results on [ChannelStore], and keep them
-  //   up-to-date by handling events
-  List<GetStreamTopicsEntry>? lastFetchedTopics;
 
   @override
   void onNewStore() {
+    final newStore = PerAccountStoreWidget.of(context);
+    topicsModel?.removeListener(_modelChanged);
+    topicsModel = newStore.topics..addListener(_modelChanged);
     unreadsModel?.removeListener(_modelChanged);
-    final store = PerAccountStoreWidget.of(context);
-    unreadsModel = store.unreads..addListener(_modelChanged);
+    unreadsModel = newStore.unreads..addListener(_modelChanged);
     _fetchTopics();
   }
 
   @override
   void dispose() {
+    topicsModel?.removeListener(_modelChanged);
     unreadsModel?.removeListener(_modelChanged);
     super.dispose();
   }
 
   void _modelChanged() {
     setState(() {
-      // The actual state lives in `unreadsModel`.
+      // The actual state lives in `topicsModel` and `unreadsModel`.
     });
   }
 
   void _fetchTopics() async {
+    // If the fetch succeeds, `topicsModel` will notify listeners.
     // Do nothing when the fetch fails; the topic-list will stay on
     // the loading screen, until the user navigates away and back.
     // TODO(design) show a nice error message on screen when this fails
-    final store = PerAccountStoreWidget.of(context);
-    final result = await getStreamTopics(store.connection,
-      streamId: widget.streamId,
-      allowEmptyTopicName: true);
-    if (!mounted) return;
-    setState(() {
-      lastFetchedTopics = result.topics;
-    });
+    await topicsModel!.getChannelTopics(widget.streamId);
   }
 
   @override
   Widget build(BuildContext context) {
-    if (lastFetchedTopics == null) {
+    final channelTopics = topicsModel!.channelTopics(widget.streamId);
+    if (channelTopics == null) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (lastFetchedTopics!.isEmpty) {
+    if (channelTopics.isEmpty) {
       final zulipLocalizations = ZulipLocalizations.of(context);
       return PageBodyEmptyContentPlaceholder(
-        header: zulipLocalizations.topicListEmptyPlaceholderHeader);
+        header: zulipLocalizations.topicListEmptyPlaceholderHeader,
+      );
     }
 
     // This is adapted from parts of the build method on [_InboxPageState].
     final topicItems = <_TopicItemData>[];
-    for (final GetStreamTopicsEntry(:maxId, name: topic) in lastFetchedTopics!) {
+    for (final GetChannelTopicsEntry(:maxId, name: topic) in channelTopics) {
       final unreadMessageIds =
-        unreadsModel!.streams[widget.streamId]?[topic] ?? <int>[];
+          unreadsModel!.streams[widget.streamId]?[topic] ?? <int>[];
       final countInTopic = unreadMessageIds.length;
-      final hasMention = unreadMessageIds.any((messageId) =>
-        unreadsModel!.mentions.contains(messageId));
-      topicItems.add(_TopicItemData(
-        topic: topic,
-        unreadCount: countInTopic,
-        hasMention: hasMention,
-        // `lastFetchedTopics.maxId` can become outdated when a new message
-        // arrives or when there are message moves, until we re-fetch.
-        // TODO(#1499): track changes to this
-        maxId: maxId,
-      ));
+      final hasMention = unreadMessageIds.any(
+        (messageId) => unreadsModel!.mentions.contains(messageId),
+      );
+      topicItems.add(
+        _TopicItemData(
+          topic: topic,
+          unreadCount: countInTopic,
+          hasMention: hasMention,
+          maxId: maxId,
+        ),
+      );
     }
-    topicItems.sort((a, b) {
-      final aMaxId = a.maxId;
-      final bMaxId = b.maxId;
-      return bMaxId.compareTo(aMaxId);
-    });
 
     return SafeArea(
       // Don't pad the bottom here; we want the list content to do that.
@@ -205,7 +224,8 @@ class _TopicListState extends State<_TopicList> with PerAccountStoreAwareStateMi
       child: ListView.builder(
         itemCount: topicItems.length,
         itemBuilder: (context, index) =>
-          _TopicItem(streamId: widget.streamId, data: topicItems[index])),
+            _TopicItem(streamId: widget.streamId, data: topicItems[index]),
+      ),
     );
   }
 }
@@ -234,11 +254,20 @@ class _TopicItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final _TopicItemData(
-      :topic, :unreadCount, :hasMention, :maxId) = data;
+    final _TopicItemData(:topic, :unreadCount, :hasMention, :maxId) = data;
 
     final store = PerAccountStoreWidget.of(context);
     final designVariables = DesignVariables.of(context);
+
+    // `maxId` might be incorrect (see [Topics.channelTopics]).
+    // Check if it refers to a message that's currently in the topic;
+    // if not, we just won't have `someMessageIdInTopic` for the action sheet.
+    final maxIdMessage = store.messages[maxId];
+    final someMessageIdInTopic =
+        (maxIdMessage != null &&
+            TopicNarrow(streamId, topic).containsMessage(maxIdMessage))
+        ? maxIdMessage.id
+        : null;
 
     final visibilityPolicy = store.topicVisibilityPolicy(streamId, topic);
     final double opacity;
@@ -261,13 +290,17 @@ class _TopicItem extends StatelessWidget {
       child: InkWell(
         onTap: () {
           final narrow = TopicNarrow(streamId, topic);
-          Navigator.push(context,
-            MessageListPage.buildRoute(context: context, narrow: narrow));
+          Navigator.push(
+            context,
+            MessageListPage.buildRoute(context: context, narrow: narrow),
+          );
         },
-        onLongPress: () => showTopicActionSheet(context,
+        onLongPress: () => showTopicActionSheet(
+          context,
           channelId: streamId,
           topic: topic,
-          someMessageIdInTopic: maxId),
+          someMessageIdInTopic: someMessageIdInTopic,
+        ),
         splashFactory: NoSplash.splashFactory,
         child: ConstrainedBox(
           constraints: BoxConstraints(minHeight: 40),
@@ -289,30 +322,49 @@ class _TopicItem extends StatelessWidget {
               children: [
                 // A null [Icon.icon] makes a blank space.
                 _IconMarker(icon: topic.isResolved ? ZulipIcons.check : null),
-                Expanded(child: Opacity(
-                  opacity: opacity,
-                  child: Text(
-                    style: TextStyle(
-                      fontSize: 17,
-                      height: 20 / 17,
-                      fontStyle: topic.displayName == null ? FontStyle.italic : null,
-                      color: designVariables.textMessage,
+                Expanded(
+                  child: Opacity(
+                    opacity: opacity,
+                    child: Text(
+                      style: TextStyle(
+                        fontSize: 17,
+                        height: 20 / 17,
+                        fontStyle: topic.displayName == null
+                            ? FontStyle.italic
+                            : null,
+                        color: designVariables.textMessage,
+                      ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      topic.unresolve().displayName ??
+                          store.realmEmptyTopicDisplayName,
                     ),
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    topic.unresolve().displayName ?? store.realmEmptyTopicDisplayName))),
-                Opacity(opacity: opacity, child: Row(
-                  spacing: 4,
-                  children: [
-                    if (hasMention) const _IconMarker(icon: ZulipIcons.at_sign),
-                    if (visibilityIcon != null) _IconMarker(icon: visibilityIcon),
-                    if (unreadCount > 0)
-                      UnreadCountBadge(
-                        count: unreadCount,
-                        channelIdForBackground: null),
-                  ])),
-              ])),
-        )));
+                  ),
+                ),
+                Opacity(
+                  opacity: opacity,
+                  child: Row(
+                    spacing: 4,
+                    children: [
+                      if (hasMention)
+                        const _IconMarker(icon: ZulipIcons.at_sign),
+                      if (visibilityIcon != null)
+                        _IconMarker(icon: visibilityIcon),
+                      if (unreadCount > 0)
+                        CounterBadge(
+                          kind: CounterBadgeKind.unread,
+                          count: unreadCount,
+                          channelIdForBackground: null,
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -327,8 +379,10 @@ class _IconMarker extends StatelessWidget {
     final textScaler = MediaQuery.textScalerOf(context);
     // Since we align the icons to [CrossAxisAlignment.center], the top padding
     // from the Figma design is omitted.
-    return Icon(icon,
+    return Icon(
+      icon,
       size: textScaler.clamp(maxScaleFactor: 1.5).scale(16),
-      color: designVariables.textMessage.withFadedAlpha(0.4));
+      color: designVariables.textMessage.withFadedAlpha(0.4),
+    );
   }
 }

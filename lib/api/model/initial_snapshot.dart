@@ -60,6 +60,8 @@ class InitialSnapshot {
 
   final UnreadMessagesSnapshot unreadMsgs;
 
+  final List<int> starredMessages;
+
   final List<ZulipStream> streams;
 
   // In register-queue, the name of this field is the singular "user_status",
@@ -76,6 +78,8 @@ class InitialSnapshot {
 
   final List<UserTopicItem> userTopics;
 
+  final bool hasZoomToken;
+
   final GroupSettingValue? realmCanDeleteAnyMessageGroup; // TODO(server-10)
 
   final GroupSettingValue? realmCanDeleteOwnMessageGroup; // TODO(server-10)
@@ -85,7 +89,8 @@ class InitialSnapshot {
   ///
   /// Removed in FL 291, so absent in the current API doc;
   /// see zulip/zulip@0cd51f2fe.
-  final RealmDeleteOwnMessagePolicy? realmDeleteOwnMessagePolicy; // TODO(server-10)
+  final RealmDeleteOwnMessagePolicy?
+  realmDeleteOwnMessagePolicy; // TODO(server-10)
 
   /// The policy for who can use wildcard mentions in large channels.
   ///
@@ -95,6 +100,10 @@ class InitialSnapshot {
   final bool realmMandatoryTopics;
 
   final String realmName;
+
+  final RealmVideoChatProvider realmVideoChatProvider;
+
+  final String? realmJitsiServerUrl; // TODO(server-8)
 
   /// The number of days until a user's account is treated as a full member.
   ///
@@ -113,13 +122,24 @@ class InitialSnapshot {
 
   final Uri realmIconUrl;
 
+  final Map<String, RealmAvailableVideoChatProviders>
+  realmAvailableVideoChatProviders;
+
   final bool realmPresenceDisabled;
 
   final Map<String, RealmDefaultExternalAccount> realmDefaultExternalAccounts;
 
+  final String?
+  jitsiServerUrl; // TODO(server-8): Can ignore this deprecated field
+
   final int maxFileUploadSizeMib;
 
+  @JsonKey(defaultValue: []) // TODO(server-9) remove default value
+  final List<ThumbnailFormat> serverThumbnailFormats;
+
   final Uri serverEmojiDataUrl;
+
+  final String? serverJitsiServerUrl; // TODO(server-8)
 
   final String? realmEmptyTopicDisplayName; // TODO(server-10)
 
@@ -139,14 +159,21 @@ class InitialSnapshot {
   // `is_active` is sometimes absent:
   //   https://chat.zulip.org/#narrow/stream/412-api-documentation/topic/.60is_active.60.20in.20.60.2Fregister.60.20response/near/1371603
   // But for our model it's convenient to always have it; so, fill it in.
-  static Object? _readUsersIsActiveFallbackTrue(Map<dynamic, dynamic> json, String key) {
+  static Object? _readUsersIsActiveFallbackTrue(
+    Map<dynamic, dynamic> json,
+    String key,
+  ) {
     final list = (json[key] as List<dynamic>);
     for (final user in list) {
       (user as Map<String, dynamic>).putIfAbsent('is_active', () => true);
     }
     return list;
   }
-  static Object? _readUsersIsActiveFallbackFalse(Map<dynamic, dynamic> json, String key) {
+
+  static Object? _readUsersIsActiveFallbackFalse(
+    Map<dynamic, dynamic> json,
+    String key,
+  ) {
     final list = (json[key] as List<dynamic>);
     for (final user in list) {
       (user as Map<String, dynamic>).putIfAbsent('is_active', () => false);
@@ -178,26 +205,34 @@ class InitialSnapshot {
     required this.subscriptions,
     required this.channelFolders,
     required this.unreadMsgs,
+    required this.starredMessages,
     required this.streams,
     required this.userStatuses,
     required this.userSettings,
     required this.userTopics,
+    required this.hasZoomToken,
     required this.realmCanDeleteAnyMessageGroup,
     required this.realmCanDeleteOwnMessageGroup,
     required this.realmDeleteOwnMessagePolicy,
     required this.realmWildcardMentionPolicy,
     required this.realmMandatoryTopics,
     required this.realmName,
+    required this.realmVideoChatProvider,
+    required this.realmJitsiServerUrl,
     required this.realmWaitingPeriodThreshold,
     required this.realmMessageContentDeleteLimitSeconds,
     required this.realmAllowMessageEditing,
     required this.realmMessageContentEditLimitSeconds,
     required this.realmEnableReadReceipts,
     required this.realmIconUrl,
+    required this.realmAvailableVideoChatProviders,
     required this.realmPresenceDisabled,
     required this.realmDefaultExternalAccounts,
+    required this.jitsiServerUrl,
     required this.maxFileUploadSizeMib,
+    required this.serverThumbnailFormats,
     required this.serverEmojiDataUrl,
+    required this.serverJitsiServerUrl,
     required this.realmEmptyTopicDisplayName,
     required this.realmUsers,
     required this.realmNonActiveUsers,
@@ -205,7 +240,7 @@ class InitialSnapshot {
   });
 
   factory InitialSnapshot.fromJson(Map<String, dynamic> json) =>
-    _$InitialSnapshotFromJson(json);
+      _$InitialSnapshotFromJson(json);
 
   Map<String, dynamic> toJson() => _$InitialSnapshotToJson(this);
 }
@@ -260,9 +295,35 @@ class RealmDefaultExternalAccount {
   });
 
   factory RealmDefaultExternalAccount.fromJson(Map<String, dynamic> json) =>
-    _$RealmDefaultExternalAccountFromJson(json);
+      _$RealmDefaultExternalAccountFromJson(json);
 
   Map<String, dynamic> toJson() => _$RealmDefaultExternalAccountToJson(this);
+}
+
+/// An item in `server_thumbnail_formats`.
+///
+/// For docs, search for "server_thumbnail_formats:"
+/// in <https://zulip.com/api/register-queue>.
+@JsonSerializable(fieldRename: FieldRename.snake)
+class ThumbnailFormat {
+  ThumbnailFormat({
+    required this.name,
+    required this.maxWidth,
+    required this.maxHeight,
+    required this.animated,
+    required this.format,
+  });
+
+  final String name;
+  final int maxWidth;
+  final int maxHeight;
+  final bool animated;
+  final String format;
+
+  factory ThumbnailFormat.fromJson(Map<String, dynamic> json) =>
+      _$ThumbnailFormatFromJson(json);
+
+  Map<String, dynamic> toJson() => _$ThumbnailFormatToJson(this);
 }
 
 /// An item in `recent_private_conversations`.
@@ -274,13 +335,10 @@ class RecentDmConversation {
   final int maxMessageId;
   final List<int> userIds;
 
-  RecentDmConversation({
-    required this.maxMessageId,
-    required this.userIds,
-  });
+  RecentDmConversation({required this.maxMessageId, required this.userIds});
 
   factory RecentDmConversation.fromJson(Map<String, dynamic> json) =>
-    _$RecentDmConversationFromJson(json);
+      _$RecentDmConversationFromJson(json);
 
   Map<String, dynamic> toJson() => _$RecentDmConversationToJson(this);
 }
@@ -297,6 +355,7 @@ class UserSettings {
   )
   TwentyFourHourTimeMode twentyFourHourTime;
 
+  bool starredMessageCounts;
   bool displayEmojiReactionUsers;
   @JsonKey(unknownEnumValue: Emojiset.unknown)
   Emojiset emojiset;
@@ -310,13 +369,14 @@ class UserSettings {
 
   UserSettings({
     required this.twentyFourHourTime,
+    required this.starredMessageCounts,
     required this.displayEmojiReactionUsers,
     required this.emojiset,
     required this.presenceEnabled,
   });
 
   factory UserSettings.fromJson(Map<String, dynamic> json) =>
-    _$UserSettingsFromJson(json);
+      _$UserSettingsFromJson(json);
 
   Map<String, dynamic> toJson() => _$UserSettingsToJson(this);
 
@@ -346,7 +406,7 @@ class UserTopicItem {
   });
 
   factory UserTopicItem.fromJson(Map<String, dynamic> json) =>
-    _$UserTopicItemFromJson(json);
+      _$UserTopicItemFromJson(json);
 
   Map<String, dynamic> toJson() => _$UserTopicItemToJson(this);
 }
@@ -381,7 +441,7 @@ class UnreadMessagesSnapshot {
   });
 
   factory UnreadMessagesSnapshot.fromJson(Map<String, dynamic> json) =>
-    _$UnreadMessagesSnapshotFromJson(json);
+      _$UnreadMessagesSnapshotFromJson(json);
 
   Map<String, dynamic> toJson() => _$UnreadMessagesSnapshotToJson(this);
 }
@@ -392,13 +452,11 @@ class UnreadDmSnapshot {
   final int otherUserId;
   final List<int> unreadMessageIds;
 
-  UnreadDmSnapshot({
-    required this.otherUserId,
-    required this.unreadMessageIds,
-  }) : assert(isSortedWithoutDuplicates(unreadMessageIds));
+  UnreadDmSnapshot({required this.otherUserId, required this.unreadMessageIds})
+    : assert(isSortedWithoutDuplicates(unreadMessageIds));
 
   factory UnreadDmSnapshot.fromJson(Map<String, dynamic> json) =>
-    _$UnreadDmSnapshotFromJson(json);
+      _$UnreadDmSnapshotFromJson(json);
 
   Map<String, dynamic> toJson() => _$UnreadDmSnapshotToJson(this);
 }
@@ -417,7 +475,7 @@ class UnreadChannelSnapshot {
   }) : assert(isSortedWithoutDuplicates(unreadMessageIds));
 
   factory UnreadChannelSnapshot.fromJson(Map<String, dynamic> json) =>
-    _$UnreadChannelSnapshotFromJson(json);
+      _$UnreadChannelSnapshotFromJson(json);
 
   Map<String, dynamic> toJson() => _$UnreadChannelSnapshotToJson(this);
 }
@@ -434,7 +492,7 @@ class UnreadHuddleSnapshot {
   }) : assert(isSortedWithoutDuplicates(unreadMessageIds));
 
   factory UnreadHuddleSnapshot.fromJson(Map<String, dynamic> json) =>
-    _$UnreadHuddleSnapshotFromJson(json);
+      _$UnreadHuddleSnapshotFromJson(json);
 
   Map<String, dynamic> toJson() => _$UnreadHuddleSnapshotToJson(this);
 }

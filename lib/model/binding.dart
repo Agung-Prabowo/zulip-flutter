@@ -3,7 +3,8 @@ import 'dart:async';
 import 'package:device_info_plus/device_info_plus.dart' as device_info_plus;
 import 'package:file_picker/file_picker.dart' as file_picker;
 import 'package:firebase_core/firebase_core.dart' as firebase_core;
-import 'package:firebase_messaging/firebase_messaging.dart' as firebase_messaging;
+import 'package:firebase_messaging/firebase_messaging.dart'
+    as firebase_messaging;
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart' as image_picker;
 import 'package:package_info_plus/package_info_plus.dart' as package_info_plus;
@@ -16,7 +17,8 @@ import '../host/notifications.dart' as notif_pigeon;
 import '../log.dart';
 import 'store.dart';
 
-export 'package:file_picker/file_picker.dart' show FilePickerResult, FileType, PlatformFile;
+export 'package:file_picker/file_picker.dart'
+    show FilePickerResult, FileType, PlatformFile;
 export 'package:image_picker/image_picker.dart' show ImageSource, XFile;
 
 /// Alias for [url_launcher.LaunchMode].
@@ -167,7 +169,8 @@ abstract class ZulipBinding {
   ///
   /// This wraps [firebase_core.Firebase.initializeApp].
   Future<void> firebaseInitializeApp({
-      required firebase_core.FirebaseOptions options});
+    required firebase_core.FirebaseOptions options,
+  });
 
   /// Wraps [firebase_messaging.FirebaseMessaging.instance].
   firebase_messaging.FirebaseMessaging get firebaseMessaging;
@@ -176,7 +179,9 @@ abstract class ZulipBinding {
   Stream<firebase_messaging.RemoteMessage> get firebaseMessagingOnMessage;
 
   /// Wraps [firebase_messaging.FirebaseMessaging.onBackgroundMessage].
-  void firebaseMessagingOnBackgroundMessage(firebase_messaging.BackgroundMessageHandler handler);
+  void firebaseMessagingOnBackgroundMessage(
+    firebase_messaging.BackgroundMessageHandler handler,
+  );
 
   /// Wraps the [AndroidNotificationHostApi] constructor.
   AndroidNotificationHostApi get androidNotificationHost;
@@ -336,11 +341,11 @@ class PackageInfo {
 class NotificationPigeonApi {
   final _hostApi = notif_pigeon.NotificationHostApi();
 
-  Future<notif_pigeon.NotificationDataFromLaunch?> getNotificationDataFromLaunch() =>
-    _hostApi.getNotificationDataFromLaunch();
+  Future<notif_pigeon.NotificationDataFromLaunch?>
+  getNotificationDataFromLaunch() => _hostApi.getNotificationDataFromLaunch();
 
   Stream<notif_pigeon.NotificationTapEvent> notificationTapEventsStream() =>
-    notif_pigeon.notificationTapEvents();
+      notif_pigeon.notificationTapEvents();
 }
 
 /// A concrete binding for use in the live application.
@@ -384,6 +389,7 @@ class LiveZulipBinding extends ZulipBinding {
     assert(_debugCalledGetGlobalStoreUniquely = true);
     return getGlobalStore();
   }
+
   bool _debugCalledGetGlobalStoreUniquely = false;
 
   @override
@@ -425,16 +431,24 @@ class LiveZulipBinding extends ZulipBinding {
     try {
       final info = await device_info_plus.DeviceInfoPlugin().deviceInfo;
       _syncDeviceInfo = switch (info) {
-        device_info_plus.AndroidDeviceInfo() => AndroidDeviceInfo(release: info.version.release,
-                                                                  sdkInt: info.version.sdkInt),
-        device_info_plus.IosDeviceInfo()     => IosDeviceInfo(systemVersion: info.systemVersion),
-        device_info_plus.MacOsDeviceInfo()   => MacOsDeviceInfo(majorVersion: info.majorVersion,
-                                                                minorVersion: info.minorVersion,
-                                                                patchVersion: info.patchVersion),
+        device_info_plus.AndroidDeviceInfo() => AndroidDeviceInfo(
+          release: info.version.release,
+          sdkInt: info.version.sdkInt,
+        ),
+        device_info_plus.IosDeviceInfo() => IosDeviceInfo(
+          systemVersion: info.systemVersion,
+        ),
+        device_info_plus.MacOsDeviceInfo() => MacOsDeviceInfo(
+          majorVersion: info.majorVersion,
+          minorVersion: info.minorVersion,
+          patchVersion: info.patchVersion,
+        ),
         device_info_plus.WindowsDeviceInfo() => const WindowsDeviceInfo(),
-        device_info_plus.LinuxDeviceInfo()   => LinuxDeviceInfo(name: info.name,
-                                                                versionId: info.versionId),
-        _                                    => throw UnimplementedError(),
+        device_info_plus.LinuxDeviceInfo() => LinuxDeviceInfo(
+          name: info.name,
+          versionId: info.versionId,
+        ),
+        _ => throw UnimplementedError(),
       };
     } catch (e, st) {
       assert(debugLog('Failed to prefetch device info: $e\n$st')); // TODO(log)
@@ -466,7 +480,8 @@ class LiveZulipBinding extends ZulipBinding {
 
   @override
   Future<void> firebaseInitializeApp({
-      required firebase_core.FirebaseOptions options}) {
+    required firebase_core.FirebaseOptions options,
+  }) {
     return firebase_core.Firebase.initializeApp(options: options);
   }
 
@@ -481,18 +496,22 @@ class LiveZulipBinding extends ZulipBinding {
   }
 
   @override
-  void firebaseMessagingOnBackgroundMessage(firebase_messaging.BackgroundMessageHandler handler) {
+  void firebaseMessagingOnBackgroundMessage(
+    firebase_messaging.BackgroundMessageHandler handler,
+  ) {
     firebase_messaging.FirebaseMessaging.onBackgroundMessage(handler);
   }
 
   @override
-  AndroidNotificationHostApi get androidNotificationHost => AndroidNotificationHostApi();
+  AndroidNotificationHostApi get androidNotificationHost =>
+      AndroidNotificationHostApi();
 
   @override
   NotificationPigeonApi get notificationPigeonApi => NotificationPigeonApi();
 
   @override
-  Stream<android_intents_pigeon.AndroidIntentEvent> get androidIntentEvents => android_intents_pigeon.androidIntentEvents();
+  Stream<android_intents_pigeon.AndroidIntentEvent> get androidIntentEvents =>
+      android_intents_pigeon.androidIntentEvents();
 
   @override
   Future<file_picker.FilePickerResult?> pickFiles({
@@ -512,8 +531,10 @@ class LiveZulipBinding extends ZulipBinding {
     required image_picker.ImageSource source,
     bool requestFullMetadata = true,
   }) async {
-    return image_picker.ImagePicker()
-      .pickImage(source: source, requestFullMetadata: requestFullMetadata);
+    return image_picker.ImagePicker().pickImage(
+      source: source,
+      requestFullMetadata: requestFullMetadata,
+    );
   }
 
   @override

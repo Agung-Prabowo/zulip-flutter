@@ -16,7 +16,8 @@ import '../widgets/color.dart';
 import '../widgets/theme.dart';
 import 'open.dart';
 
-AndroidNotificationHostApi get _androidHost => ZulipBinding.instance.androidNotificationHost;
+AndroidNotificationHostApi get _androidHost =>
+    ZulipBinding.instance.androidNotificationHost;
 
 enum NotificationSound {
   // TODO(i18n): translate these file display names
@@ -89,14 +90,17 @@ class NotificationChannelManager {
   static Future<String> _ensureInitNotificationSounds() async {
     String defaultSoundUrl = await _resourceUrlFromName(
       resourceTypeName: 'raw',
-      resourceEntryName: kDefaultNotificationSound.resourceName);
+      resourceEntryName: kDefaultNotificationSound.resourceName,
+    );
 
-    final shouldUseResourceFile = switch (await ZulipBinding.instance.deviceInfo) {
+    final shouldUseResourceFile = switch (await ZulipBinding
+        .instance
+        .deviceInfo) {
       // Before Android 10 Q, we don't attempt to put the sounds in shared media storage.
       // Just use the resource file directly.
       // TODO(android-sdk-29): Simplify this away.
       AndroidDeviceInfo(:var sdkInt) => sdkInt < 29,
-      _                              => true,
+      _ => true,
     };
     if (shouldUseResourceFile) return defaultSoundUrl;
 
@@ -106,7 +110,8 @@ class NotificationChannelManager {
 
     final List<StoredNotificationSound> storedSounds;
     try {
-      storedSounds = await _androidHost.listStoredSoundsInNotificationsDirectory();
+      storedSounds = await _androidHost
+          .listStoredSoundsInNotificationsDirectory();
     } catch (e, st) {
       assert(debugLog('$e\n$st')); // TODO(log)
       return defaultSoundUrl;
@@ -114,8 +119,8 @@ class NotificationChannelManager {
     for (final storedSound in storedSounds) {
       // If the file is one we put there, and has the name we give to our
       // default sound, then use it as the default sound.
-      if (storedSound.fileName == kDefaultNotificationSound.fileDisplayName
-          && storedSound.isOwned) {
+      if (storedSound.fileName == kDefaultNotificationSound.fileDisplayName &&
+          storedSound.isOwned) {
         defaultSoundUrl = storedSound.contentUrl;
       }
 
@@ -143,7 +148,8 @@ class NotificationChannelManager {
       try {
         final url = await _androidHost.copySoundResourceToMediaStore(
           targetFileDisplayName: sound.fileDisplayName,
-          sourceResourceName: sound.resourceName);
+          sourceResourceName: sound.resourceName,
+        );
 
         if (sound == kDefaultNotificationSound) {
           defaultSoundUrl = url;
@@ -198,14 +204,16 @@ class NotificationChannelManager {
 
     final defaultSoundUrl = await _ensureInitNotificationSounds();
 
-    await _androidHost.createNotificationChannel(NotificationChannel(
-      id: kChannelId,
-      name: 'Messages', // TODO(#1284)
-      importance: NotificationImportance.high,
-      lightsEnabled: true,
-      soundUrl: defaultSoundUrl,
-      vibrationPattern: kVibrationPattern,
-    ));
+    await _androidHost.createNotificationChannel(
+      NotificationChannel(
+        id: kChannelId,
+        name: 'Messages', // TODO(#1284)
+        importance: NotificationImportance.high,
+        lightsEnabled: true,
+        soundUrl: defaultSoundUrl,
+        vibrationPattern: kVibrationPattern,
+      ),
+    );
   }
 }
 
@@ -219,21 +227,30 @@ class NotificationDisplayManager {
   static void onFcmMessage(FcmMessage data, Map<String, dynamic> dataJson) {
     assert(defaultTargetPlatform == TargetPlatform.android);
     switch (data) {
-      case MessageFcmMessage(): _onMessageFcmMessage(data, dataJson);
-      case RemoveFcmMessage(): _onRemoveFcmMessage(data);
-      case UnexpectedFcmMessage(): break; // TODO(log)
+      case MessageFcmMessage():
+        _onMessageFcmMessage(data, dataJson);
+      case RemoveFcmMessage():
+        _onRemoveFcmMessage(data);
+      case UnexpectedFcmMessage():
+        break; // TODO(log)
     }
   }
 
-  static Future<void> _onMessageFcmMessage(MessageFcmMessage data, Map<String, dynamic> dataJson) async {
+  static Future<void> _onMessageFcmMessage(
+    MessageFcmMessage data,
+    Map<String, dynamic> dataJson,
+  ) async {
     assert(debugLog('notif message content: ${data.content}'));
     final zulipLocalizations = GlobalLocalizations.zulipLocalizations;
     final groupKey = _groupKey(data.realmUrl, data.userId);
     final conversationKey = _conversationKey(data, groupKey);
 
     final globalStore = await ZulipBinding.instance.getGlobalStore();
-    final account = globalStore.accounts.firstWhereOrNull((account) =>
-      account.realmUrl.origin == data.realmUrl.origin && account.userId == data.userId);
+    final account = globalStore.accounts.firstWhereOrNull(
+      (account) =>
+          account.realmUrl.origin == data.realmUrl.origin &&
+          account.userId == data.userId,
+    );
 
     // Skip showing notifications for a logged-out account. This can occur if
     // the unregisterToken request failed previously. It would be annoying
@@ -244,24 +261,28 @@ class NotificationDisplayManager {
     }
 
     final oldMessagingStyle = await _androidHost
-      .getActiveNotificationMessagingStyleByTag(conversationKey);
+        .getActiveNotificationMessagingStyleByTag(conversationKey);
 
     final MessagingStyle messagingStyle;
     if (oldMessagingStyle != null) {
       messagingStyle = oldMessagingStyle;
-      messagingStyle.messages =
-        oldMessagingStyle.messages.toList(); // Clone fixed-length list to growable.
+      messagingStyle.messages = oldMessagingStyle.messages
+          .toList(); // Clone fixed-length list to growable.
     } else {
       messagingStyle = MessagingStyle(
         user: Person(
           key: _personKey(data.realmUrl, data.userId),
-          name: zulipLocalizations.notifSelfUser),
+          name: zulipLocalizations.notifSelfUser,
+        ),
         messages: [],
         isGroupConversation: switch (data.recipient) {
           FcmMessageChannelRecipient() => true,
-          FcmMessageDmRecipient(:var allRecipientIds) when allRecipientIds.length > 2 => true,
+          FcmMessageDmRecipient(:var allRecipientIds)
+              when allRecipientIds.length > 2 =>
+            true,
           FcmMessageDmRecipient() => false,
-        });
+        },
+      );
     }
 
     // The title typically won't change between messages in a conversation, but we
@@ -274,30 +295,41 @@ class NotificationDisplayManager {
         '#$streamName > ${topic.displayName}',
       FcmMessageChannelRecipient(:var topic) =>
         '#${zulipLocalizations.unknownChannelName} > ${topic.displayName}', // TODO get stream name from data
-      FcmMessageDmRecipient(:var allRecipientIds) when allRecipientIds.length > 2 =>
+      FcmMessageDmRecipient(:var allRecipientIds)
+          when allRecipientIds.length > 2 =>
         zulipLocalizations.notifGroupDmConversationLabel(
-          data.senderFullName, allRecipientIds.length - 2), // TODO use others' names, from data
-      FcmMessageDmRecipient() =>
-        data.senderFullName,
+          data.senderFullName,
+          allRecipientIds.length - 2,
+        ), // TODO use others' names, from data
+      FcmMessageDmRecipient() => data.senderFullName,
     };
 
-    messagingStyle.messages.add(MessagingStyleMessage(
-      text: data.content,
-      timestampMs: data.time * 1000,
-      person: Person(
-        key: _personKey(data.realmUrl, data.senderId),
-        name: data.senderFullName,
-        iconBitmap: await _fetchBitmap(data.senderAvatarUrl))));
+    messagingStyle.messages.add(
+      MessagingStyleMessage(
+        text: data.content,
+        timestampMs: data.time * 1000,
+        person: Person(
+          key: _personKey(data.realmUrl, data.senderId),
+          name: data.senderFullName,
+          iconBitmap: await _fetchBitmap(data.senderAvatarUrl),
+        ),
+      ),
+    );
 
     final intentDataUrl = NotificationOpenPayload(
       realmUrl: data.realmUrl,
       userId: data.userId,
       narrow: switch (data.recipient) {
-        FcmMessageChannelRecipient(:var streamId, :var topic) =>
-          TopicNarrow(streamId, topic),
-        FcmMessageDmRecipient(:var allRecipientIds) =>
-          DmNarrow(allRecipientIds: allRecipientIds, selfUserId: data.userId),
-      }).buildAndroidNotificationUrl();
+        FcmMessageChannelRecipient(:var streamId, :var topic) => TopicNarrow(
+          streamId,
+          topic,
+        ),
+        FcmMessageDmRecipient(:var allRecipientIds) => DmNarrow(
+          allRecipientIds: allRecipientIds,
+          selfUserId: data.userId,
+        ),
+      },
+    ).buildAndroidNotificationUrl();
 
     await _androidHost.notify(
       id: kNotificationId,
@@ -307,7 +339,8 @@ class NotificationDisplayManager {
 
       color: kZulipBrandColor.argbInt,
       // TODO vary notification icon for debug
-      smallIconResourceName: 'zulip_notification', // This name must appear in keep.xml too: https://github.com/zulip/zulip-flutter/issues/528
+      smallIconResourceName:
+          'zulip_notification', // This name must appear in keep.xml too: https://github.com/zulip/zulip-flutter/issues/528
 
       messagingStyle: messagingStyle,
       number: messagingStyle.messages.length,
@@ -338,7 +371,9 @@ class NotificationDisplayManager {
           //   notification manager does; so use that.  It has no effect as long
           //   as we only have one activity; but if we add more, it will destroy
           //   all the activities on top of the target one.
-          flags: IntentFlag.activityClearTop | IntentFlag.activityNewTask)),
+          flags: IntentFlag.activityClearTop | IntentFlag.activityNewTask,
+        ),
+      ),
       autoCancel: true,
     );
 
@@ -351,10 +386,12 @@ class NotificationDisplayManager {
 
       color: kZulipBrandColor.argbInt,
       // TODO vary notification icon for debug
-      smallIconResourceName: 'zulip_notification', // This name must appear in keep.xml too: https://github.com/zulip/zulip-flutter/issues/528
+      smallIconResourceName:
+          'zulip_notification', // This name must appear in keep.xml too: https://github.com/zulip/zulip-flutter/issues/528
       inboxStyle: InboxStyle(
         // TODO(#570) Show organization name, not URL
-        summaryText: data.realmUrl.toString()),
+        summaryText: data.realmUrl.toString(),
+      ),
 
       // On Android 11 and lower, if autoCancel is not specified,
       // the summary notification may linger even after all child
@@ -383,7 +420,8 @@ class NotificationDisplayManager {
     //   https://github.com/zulip/zulip-mobile/pull/4842#pullrequestreview-725817909
     var haveRemaining = false;
     final activeNotifications = await _androidHost.getActiveNotifications(
-      desiredExtras: [kExtraLastZulipMessageId]);
+      desiredExtras: [kExtraLastZulipMessageId],
+    );
     for (final statusBarNotification in activeNotifications) {
       // The StatusBarNotification object describes an active notification in the UI.
       // Its `.tag`, `.id`, and `.notification` are the same values as we passed to
@@ -392,9 +430,13 @@ class NotificationDisplayManager {
       final notification = statusBarNotification.notification;
 
       // Sadly we don't get toString on Pigeon data classes: flutter#59027
-      assert(debugLog('  existing notif'
-        ' id: ${statusBarNotification.id}, tag: ${statusBarNotification.tag},'
-        ' notification: (group: ${notification.group}, extras: ${notification.extras}))'));
+      assert(
+        debugLog(
+          '  existing notif'
+          ' id: ${statusBarNotification.id}, tag: ${statusBarNotification.tag},'
+          ' notification: (group: ${notification.group}, extras: ${notification.extras}))',
+        ),
+      );
 
       // Don't act on notifications that are for other Zulip accounts/identities.
       if (notification.group != groupKey) continue;
@@ -410,7 +452,9 @@ class NotificationDisplayManager {
         // The latest Zulip message in this conversation was read.
         // That's our cue to cancel the notification for the conversation.
         await _androidHost.cancel(
-          tag: statusBarNotification.tag, id: statusBarNotification.id);
+          tag: statusBarNotification.tag,
+          id: statusBarNotification.id,
+        );
         assert(debugLog('  … notif cancelled.'));
       } else {
         // This notification is for another conversation that's still unread.
@@ -430,16 +474,22 @@ class NotificationDisplayManager {
     }
   }
 
-  static Future<void> removeNotificationsForAccount(Uri realmUrl, int userId) async {
+  static Future<void> removeNotificationsForAccount(
+    Uri realmUrl,
+    int userId,
+  ) async {
     assert(defaultTargetPlatform == TargetPlatform.android);
 
     final groupKey = _groupKey(realmUrl, userId);
     final activeNotifications = await _androidHost.getActiveNotifications(
-      desiredExtras: []);
+      desiredExtras: [],
+    );
     for (final statusBarNotification in activeNotifications) {
       if (statusBarNotification.notification.group == groupKey) {
         await _androidHost.cancel(
-          tag: statusBarNotification.tag, id: statusBarNotification.id);
+          tag: statusBarNotification.tag,
+          id: statusBarNotification.id,
+        );
       }
     }
   }
@@ -462,8 +512,10 @@ class NotificationDisplayManager {
 
   static String _conversationKey(MessageFcmMessage data, String groupKey) {
     final conversation = switch (data.recipient) {
-      FcmMessageChannelRecipient(:var streamId, :var topic) => 'stream:$streamId:${topic.canonicalize()}',
-      FcmMessageDmRecipient(:var allRecipientIds) => 'dm:${allRecipientIds.join(',')}',
+      FcmMessageChannelRecipient(:var streamId, :var topic) =>
+        'stream:$streamId:${topic.canonicalize()}',
+      FcmMessageDmRecipient(:var allRecipientIds) =>
+        'dm:${allRecipientIds.join(',')}',
     };
     return '$groupKey|$conversation';
   }

@@ -20,17 +20,36 @@ mixin RealmStore on PerAccountStoreBase, UserGroupStore {
   //|//////////////////////////////////////////////////////////////
   // Server settings, explicitly so named.
 
-  Duration get serverPresencePingInterval => Duration(seconds: serverPresencePingIntervalSeconds);
+  Duration get serverPresencePingInterval =>
+      Duration(seconds: serverPresencePingIntervalSeconds);
   int get serverPresencePingIntervalSeconds;
-  Duration get serverPresenceOfflineThreshold => Duration(seconds: serverPresenceOfflineThresholdSeconds);
+  Duration get serverPresenceOfflineThreshold =>
+      Duration(seconds: serverPresenceOfflineThresholdSeconds);
   int get serverPresenceOfflineThresholdSeconds;
 
-  Duration get serverTypingStartedExpiryPeriod => Duration(milliseconds: serverTypingStartedExpiryPeriodMilliseconds);
+  Duration get serverTypingStartedExpiryPeriod =>
+      Duration(milliseconds: serverTypingStartedExpiryPeriodMilliseconds);
   int get serverTypingStartedExpiryPeriodMilliseconds;
-  Duration get serverTypingStoppedWaitPeriod => Duration(milliseconds: serverTypingStoppedWaitPeriodMilliseconds);
+  Duration get serverTypingStoppedWaitPeriod =>
+      Duration(milliseconds: serverTypingStoppedWaitPeriodMilliseconds);
   int get serverTypingStoppedWaitPeriodMilliseconds;
-  Duration get serverTypingStartedWaitPeriod => Duration(milliseconds: serverTypingStartedWaitPeriodMilliseconds);
+  Duration get serverTypingStartedWaitPeriod =>
+      Duration(milliseconds: serverTypingStartedWaitPeriodMilliseconds);
   int get serverTypingStartedWaitPeriodMilliseconds;
+
+  String? get serverJitsiServerUrl;
+
+  List<ThumbnailFormat> get serverThumbnailFormats;
+
+  /// A digest of [serverThumbnailFormats]:
+  /// sorted by max-width plus max-height, ascending,
+  /// and filtered to those with `animated: true`.
+  List<ThumbnailFormat> get sortedAnimatedThumbnailFormats;
+
+  /// A digest of [serverThumbnailFormats]:
+  /// sorted by max-width plus max-height, ascending,
+  /// and filtered to those with `animated: false`.
+  List<ThumbnailFormat> get sortedStillThumbnailFormats;
 
   //|//////////////////////////////////////////////////////////////
   // Realm settings.
@@ -46,22 +65,27 @@ mixin RealmStore on PerAccountStoreBase, UserGroupStore {
   GroupSettingValue? get realmCanDeleteAnyMessageGroup; // TODO(server-10)
   GroupSettingValue? get realmCanDeleteOwnMessageGroup; // TODO(server-10)
   bool get realmEnableReadReceipts;
+  String? get realmJitsiServerUrl;
   bool get realmMandatoryTopics;
   int get maxFileUploadSizeMib;
   int? get realmMessageContentDeleteLimitSeconds;
   Duration? get realmMessageContentEditLimit =>
-    realmMessageContentEditLimitSeconds == null ? null
+      realmMessageContentEditLimitSeconds == null
+      ? null
       : Duration(seconds: realmMessageContentEditLimitSeconds!);
   int? get realmMessageContentEditLimitSeconds;
   bool get realmPresenceDisabled;
+  RealmVideoChatProvider get realmVideoChatProvider;
   int get realmWaitingPeriodThreshold;
 
   //|//////////////////////////////
   // Realm settings previously found in realm/update_dict events,
   // but now deprecated.
 
-  RealmWildcardMentionPolicy get realmWildcardMentionPolicy; // TODO(#662): replaced by can_mention_many_users_group
-  RealmDeleteOwnMessagePolicy? get realmDeleteOwnMessagePolicy; // TODO(server-10) remove
+  RealmWildcardMentionPolicy
+  get realmWildcardMentionPolicy; // TODO(#662): replaced by can_mention_many_users_group
+  RealmDeleteOwnMessagePolicy?
+  get realmDeleteOwnMessagePolicy; // TODO(server-10) remove
 
   //|//////////////////////////////
   // Realm settings that lack events.
@@ -74,10 +98,15 @@ mixin RealmStore on PerAccountStoreBase, UserGroupStore {
   // TODO(server-10) simplify this
   String get realmEmptyTopicDisplayName;
 
+  Map<String, RealmAvailableVideoChatProviders>
+  get realmAvailableVideoChatProviders;
+
   Map<String, RealmDefaultExternalAccount> get realmDefaultExternalAccounts;
 
   int get maxChannelNameLength;
   int get maxTopicLength;
+
+  String? get jitsiServerUrl;
 
   //|//////////////////////////////
   // Realm settings with their own events.
@@ -146,8 +175,11 @@ mixin RealmStore on PerAccountStoreBase, UserGroupStore {
   ///
   /// If the server doesn't know about the permission,
   /// pass null for [value] and a reasonable default will be chosen.
-  bool selfHasPermissionForGroupSetting(GroupSettingValue? value,
-    GroupSettingType type, String name);
+  bool selfHasPermissionForGroupSetting(
+    GroupSettingValue? value,
+    GroupSettingType type,
+    String name,
+  );
 }
 
 enum GroupSettingType { realm, stream, group }
@@ -157,62 +189,103 @@ mixin ProxyRealmStore on RealmStore {
   RealmStore get realmStore;
 
   @override
-  int get serverPresencePingIntervalSeconds => realmStore.serverPresencePingIntervalSeconds;
+  int get serverPresencePingIntervalSeconds =>
+      realmStore.serverPresencePingIntervalSeconds;
   @override
-  int get serverPresenceOfflineThresholdSeconds => realmStore.serverPresenceOfflineThresholdSeconds;
+  int get serverPresenceOfflineThresholdSeconds =>
+      realmStore.serverPresenceOfflineThresholdSeconds;
   @override
-  int get serverTypingStartedExpiryPeriodMilliseconds => realmStore.serverTypingStartedExpiryPeriodMilliseconds;
+  int get serverTypingStartedExpiryPeriodMilliseconds =>
+      realmStore.serverTypingStartedExpiryPeriodMilliseconds;
   @override
-  int get serverTypingStoppedWaitPeriodMilliseconds => realmStore.serverTypingStoppedWaitPeriodMilliseconds;
+  int get serverTypingStoppedWaitPeriodMilliseconds =>
+      realmStore.serverTypingStoppedWaitPeriodMilliseconds;
   @override
-  int get serverTypingStartedWaitPeriodMilliseconds => realmStore.serverTypingStartedWaitPeriodMilliseconds;
+  int get serverTypingStartedWaitPeriodMilliseconds =>
+      realmStore.serverTypingStartedWaitPeriodMilliseconds;
+  @override
+  List<ThumbnailFormat> get serverThumbnailFormats =>
+      realmStore.serverThumbnailFormats;
+  @override
+  List<ThumbnailFormat> get sortedAnimatedThumbnailFormats =>
+      realmStore.sortedAnimatedThumbnailFormats;
+  @override
+  List<ThumbnailFormat> get sortedStillThumbnailFormats =>
+      realmStore.sortedStillThumbnailFormats;
+  @override
+  String? get serverJitsiServerUrl => realmStore.serverJitsiServerUrl;
   @override
   bool get realmAllowMessageEditing => realmStore.realmAllowMessageEditing;
   @override
-  GroupSettingValue? get realmCanDeleteAnyMessageGroup => realmStore.realmCanDeleteAnyMessageGroup;
+  GroupSettingValue? get realmCanDeleteAnyMessageGroup =>
+      realmStore.realmCanDeleteAnyMessageGroup;
   @override
-  GroupSettingValue? get realmCanDeleteOwnMessageGroup => realmStore.realmCanDeleteOwnMessageGroup;
+  GroupSettingValue? get realmCanDeleteOwnMessageGroup =>
+      realmStore.realmCanDeleteOwnMessageGroup;
   @override
   bool get realmEnableReadReceipts => realmStore.realmEnableReadReceipts;
+  @override
+  String? get realmJitsiServerUrl => realmStore.realmJitsiServerUrl;
   @override
   bool get realmMandatoryTopics => realmStore.realmMandatoryTopics;
   @override
   int get maxFileUploadSizeMib => realmStore.maxFileUploadSizeMib;
   @override
-  int? get realmMessageContentDeleteLimitSeconds => realmStore.realmMessageContentDeleteLimitSeconds;
+  int? get realmMessageContentDeleteLimitSeconds =>
+      realmStore.realmMessageContentDeleteLimitSeconds;
   @override
-  int? get realmMessageContentEditLimitSeconds => realmStore.realmMessageContentEditLimitSeconds;
+  int? get realmMessageContentEditLimitSeconds =>
+      realmStore.realmMessageContentEditLimitSeconds;
   @override
   bool get realmPresenceDisabled => realmStore.realmPresenceDisabled;
   @override
+  RealmVideoChatProvider get realmVideoChatProvider =>
+      realmStore.realmVideoChatProvider;
+  @override
   int get realmWaitingPeriodThreshold => realmStore.realmWaitingPeriodThreshold;
   @override
-  RealmWildcardMentionPolicy get realmWildcardMentionPolicy => realmStore.realmWildcardMentionPolicy;
+  RealmWildcardMentionPolicy get realmWildcardMentionPolicy =>
+      realmStore.realmWildcardMentionPolicy;
   @override
-  RealmDeleteOwnMessagePolicy? get realmDeleteOwnMessagePolicy => realmStore.realmDeleteOwnMessagePolicy;
+  RealmDeleteOwnMessagePolicy? get realmDeleteOwnMessagePolicy =>
+      realmStore.realmDeleteOwnMessagePolicy;
   @override
-  String get realmEmptyTopicDisplayName => realmStore.realmEmptyTopicDisplayName;
+  String get realmEmptyTopicDisplayName =>
+      realmStore.realmEmptyTopicDisplayName;
   @override
-  Map<String, RealmDefaultExternalAccount> get realmDefaultExternalAccounts => realmStore.realmDefaultExternalAccounts;
+  Map<String, RealmAvailableVideoChatProviders>
+  get realmAvailableVideoChatProviders =>
+      realmStore.realmAvailableVideoChatProviders;
+  @override
+  Map<String, RealmDefaultExternalAccount> get realmDefaultExternalAccounts =>
+      realmStore.realmDefaultExternalAccounts;
   @override
   int get maxChannelNameLength => realmStore.maxChannelNameLength;
   @override
   int get maxTopicLength => realmStore.maxTopicLength;
   @override
-  List<CustomProfileField> get customProfileFields => realmStore.customProfileFields;
+  String? get jitsiServerUrl => realmStore.jitsiServerUrl;
+  @override
+  List<CustomProfileField> get customProfileFields =>
+      realmStore.customProfileFields;
   @override
   bool selfHasPassedWaitingPeriod({required DateTime byDate}) =>
-    realmStore.selfHasPassedWaitingPeriod(byDate: byDate);
+      realmStore.selfHasPassedWaitingPeriod(byDate: byDate);
   @override
-  bool selfHasPermissionForGroupSetting(GroupSettingValue? value, GroupSettingType type, String name) =>
-    realmStore.selfHasPermissionForGroupSetting(value, type, name);
+  bool selfHasPermissionForGroupSetting(
+    GroupSettingValue? value,
+    GroupSettingType type,
+    String name,
+  ) => realmStore.selfHasPermissionForGroupSetting(value, type, name);
 }
 
 /// A base class for [PerAccountStore] substores that need access to [RealmStore]
 /// as well as to [CorePerAccountStore].
-abstract class HasRealmStore extends HasUserGroupStore with RealmStore, ProxyRealmStore {
+abstract class HasRealmStore extends HasUserGroupStore
+    with RealmStore, ProxyRealmStore {
   HasRealmStore({required RealmStore realm})
-    : realmStore = realm, super(groups: realm.userGroupStore);
+    : realmStore = realm,
+      super(groups: realm.userGroupStore);
 
   @protected
   @override
@@ -225,31 +298,59 @@ class RealmStoreImpl extends HasUserGroupStore with RealmStore {
     required super.groups,
     required InitialSnapshot initialSnapshot,
     required User selfUser,
-  }) :
-    _selfUserRole = selfUser.role,
-    _selfUserDateJoined = selfUser.dateJoined,
-    serverPresencePingIntervalSeconds = initialSnapshot.serverPresencePingIntervalSeconds,
-    serverPresenceOfflineThresholdSeconds = initialSnapshot.serverPresenceOfflineThresholdSeconds,
-    serverTypingStartedExpiryPeriodMilliseconds = initialSnapshot.serverTypingStartedExpiryPeriodMilliseconds,
-    serverTypingStoppedWaitPeriodMilliseconds = initialSnapshot.serverTypingStoppedWaitPeriodMilliseconds,
-    serverTypingStartedWaitPeriodMilliseconds = initialSnapshot.serverTypingStartedWaitPeriodMilliseconds,
-    realmAllowMessageEditing = initialSnapshot.realmAllowMessageEditing,
-    realmCanDeleteAnyMessageGroup = initialSnapshot.realmCanDeleteAnyMessageGroup,
-    realmCanDeleteOwnMessageGroup = initialSnapshot.realmCanDeleteOwnMessageGroup,
-    realmMandatoryTopics = initialSnapshot.realmMandatoryTopics,
-    maxFileUploadSizeMib = initialSnapshot.maxFileUploadSizeMib,
-    realmMessageContentDeleteLimitSeconds = initialSnapshot.realmMessageContentDeleteLimitSeconds,
-    realmMessageContentEditLimitSeconds = initialSnapshot.realmMessageContentEditLimitSeconds,
-    realmEnableReadReceipts = initialSnapshot.realmEnableReadReceipts,
-    realmPresenceDisabled = initialSnapshot.realmPresenceDisabled,
-    realmWaitingPeriodThreshold = initialSnapshot.realmWaitingPeriodThreshold,
-    realmWildcardMentionPolicy = initialSnapshot.realmWildcardMentionPolicy,
-    realmDeleteOwnMessagePolicy = initialSnapshot.realmDeleteOwnMessagePolicy,
-    _realmEmptyTopicDisplayName = initialSnapshot.realmEmptyTopicDisplayName,
-    realmDefaultExternalAccounts = initialSnapshot.realmDefaultExternalAccounts,
-    maxChannelNameLength = initialSnapshot.maxChannelNameLength,
-    maxTopicLength = initialSnapshot.maxTopicLength,
-    customProfileFields = _sortCustomProfileFields(initialSnapshot.customProfileFields);
+  }) : _selfUserRole = selfUser.role,
+       _selfUserDateJoined = selfUser.dateJoined,
+       serverPresencePingIntervalSeconds =
+           initialSnapshot.serverPresencePingIntervalSeconds,
+       serverPresenceOfflineThresholdSeconds =
+           initialSnapshot.serverPresenceOfflineThresholdSeconds,
+       serverTypingStartedExpiryPeriodMilliseconds =
+           initialSnapshot.serverTypingStartedExpiryPeriodMilliseconds,
+       serverTypingStoppedWaitPeriodMilliseconds =
+           initialSnapshot.serverTypingStoppedWaitPeriodMilliseconds,
+       serverTypingStartedWaitPeriodMilliseconds =
+           initialSnapshot.serverTypingStartedWaitPeriodMilliseconds,
+       serverThumbnailFormats = initialSnapshot.serverThumbnailFormats,
+       _sortedAnimatedThumbnailFormats = _filterAndSortThumbnailFormats(
+         initialSnapshot.serverThumbnailFormats,
+         animated: true,
+       ),
+       _sortedStillThumbnailFormats = _filterAndSortThumbnailFormats(
+         initialSnapshot.serverThumbnailFormats,
+         animated: false,
+       ),
+       serverJitsiServerUrl = initialSnapshot.serverJitsiServerUrl,
+       realmAllowMessageEditing = initialSnapshot.realmAllowMessageEditing,
+       realmCanDeleteAnyMessageGroup =
+           initialSnapshot.realmCanDeleteAnyMessageGroup,
+       realmCanDeleteOwnMessageGroup =
+           initialSnapshot.realmCanDeleteOwnMessageGroup,
+       realmEnableReadReceipts = initialSnapshot.realmEnableReadReceipts,
+       realmJitsiServerUrl = initialSnapshot.realmJitsiServerUrl,
+       realmMandatoryTopics = initialSnapshot.realmMandatoryTopics,
+       maxFileUploadSizeMib = initialSnapshot.maxFileUploadSizeMib,
+       realmMessageContentDeleteLimitSeconds =
+           initialSnapshot.realmMessageContentDeleteLimitSeconds,
+       realmMessageContentEditLimitSeconds =
+           initialSnapshot.realmMessageContentEditLimitSeconds,
+       realmPresenceDisabled = initialSnapshot.realmPresenceDisabled,
+       realmVideoChatProvider = initialSnapshot.realmVideoChatProvider,
+       realmWaitingPeriodThreshold =
+           initialSnapshot.realmWaitingPeriodThreshold,
+       realmWildcardMentionPolicy = initialSnapshot.realmWildcardMentionPolicy,
+       realmDeleteOwnMessagePolicy =
+           initialSnapshot.realmDeleteOwnMessagePolicy,
+       _realmEmptyTopicDisplayName = initialSnapshot.realmEmptyTopicDisplayName,
+       realmAvailableVideoChatProviders =
+           initialSnapshot.realmAvailableVideoChatProviders,
+       realmDefaultExternalAccounts =
+           initialSnapshot.realmDefaultExternalAccounts,
+       maxChannelNameLength = initialSnapshot.maxChannelNameLength,
+       maxTopicLength = initialSnapshot.maxTopicLength,
+       jitsiServerUrl = initialSnapshot.jitsiServerUrl,
+       customProfileFields = _sortCustomProfileFields(
+         initialSnapshot.customProfileFields,
+       );
 
   @override
   bool selfHasPassedWaitingPeriod({required DateTime byDate}) {
@@ -268,8 +369,11 @@ class RealmStoreImpl extends HasUserGroupStore with RealmStore {
   }
 
   @override
-  bool selfHasPermissionForGroupSetting(GroupSettingValue? value,
-      GroupSettingType type, String name) {
+  bool selfHasPermissionForGroupSetting(
+    GroupSettingValue? value,
+    GroupSettingType type,
+    String name,
+  ) {
     // Compare web's settings_data.user_has_permission_for_group_setting.
     //
     // In the whole web app, there's just one caller for that function with
@@ -334,7 +438,10 @@ class RealmStoreImpl extends HasUserGroupStore with RealmStore {
   }
 
   /// The metadata for how to interpret the given group-based permission setting.
-  PermissionSettingsItem _groupSettingConfig(GroupSettingType type, String name) {
+  PermissionSettingsItem _groupSettingConfig(
+    GroupSettingType type,
+    String name,
+  ) {
     final supportedSettings = SupportedPermissionSettings.fixture;
 
     // Compare web's group_permission_settings.get_group_permission_setting_config.
@@ -377,6 +484,19 @@ class RealmStoreImpl extends HasUserGroupStore with RealmStore {
   final int serverTypingStoppedWaitPeriodMilliseconds;
   @override
   final int serverTypingStartedWaitPeriodMilliseconds;
+  @override
+  final String? serverJitsiServerUrl;
+
+  @override
+  final List<ThumbnailFormat> serverThumbnailFormats;
+  @override
+  List<ThumbnailFormat> get sortedAnimatedThumbnailFormats =>
+      _sortedAnimatedThumbnailFormats;
+  final List<ThumbnailFormat> _sortedAnimatedThumbnailFormats;
+  @override
+  List<ThumbnailFormat> get sortedStillThumbnailFormats =>
+      _sortedStillThumbnailFormats;
+  final List<ThumbnailFormat> _sortedStillThumbnailFormats;
 
   @override
   final bool realmAllowMessageEditing;
@@ -387,6 +507,8 @@ class RealmStoreImpl extends HasUserGroupStore with RealmStore {
   @override
   final bool realmEnableReadReceipts;
   @override
+  final String? realmJitsiServerUrl;
+  @override
   final bool realmMandatoryTopics;
   @override
   final int maxFileUploadSizeMib;
@@ -396,6 +518,8 @@ class RealmStoreImpl extends HasUserGroupStore with RealmStore {
   final int? realmMessageContentEditLimitSeconds;
   @override
   final bool realmPresenceDisabled;
+  @override
+  final RealmVideoChatProvider realmVideoChatProvider;
   @override
   final int realmWaitingPeriodThreshold;
 
@@ -410,7 +534,12 @@ class RealmStoreImpl extends HasUserGroupStore with RealmStore {
     assert(_realmEmptyTopicDisplayName != null); // TODO(log)
     return _realmEmptyTopicDisplayName ?? 'general chat';
   }
+
   final String? _realmEmptyTopicDisplayName;
+
+  @override
+  final Map<String, RealmAvailableVideoChatProviders>
+  realmAvailableVideoChatProviders;
 
   @override
   final Map<String, RealmDefaultExternalAccount> realmDefaultExternalAccounts;
@@ -421,9 +550,14 @@ class RealmStoreImpl extends HasUserGroupStore with RealmStore {
   final int maxTopicLength;
 
   @override
+  final String? jitsiServerUrl;
+
+  @override
   List<CustomProfileField> customProfileFields;
 
-  static List<CustomProfileField> _sortCustomProfileFields(List<CustomProfileField> initialCustomProfileFields) {
+  static List<CustomProfileField> _sortCustomProfileFields(
+    List<CustomProfileField> initialCustomProfileFields,
+  ) {
     // TODO(server): The realm-wide field objects have an `order` property,
     //   but the actual API appears to be that the fields should be shown in
     //   the order they appear in the array (`custom_profile_fields` in the
@@ -433,9 +567,30 @@ class RealmStoreImpl extends HasUserGroupStore with RealmStore {
     // We go on to put at the start of the list any fields that are marked for
     // displaying in the "profile summary".  (Possibly they should be at the
     // start of the list in the first place, but make sure just in case.)
-    final displayFields = initialCustomProfileFields.where((e) => e.displayInProfileSummary == true);
-    final nonDisplayFields = initialCustomProfileFields.where((e) => e.displayInProfileSummary != true);
+    final displayFields = initialCustomProfileFields.where(
+      (e) => e.displayInProfileSummary == true,
+    );
+    final nonDisplayFields = initialCustomProfileFields.where(
+      (e) => e.displayInProfileSummary != true,
+    );
     return displayFields.followedBy(nonDisplayFields).toList();
+  }
+
+  static List<ThumbnailFormat> _filterAndSortThumbnailFormats(
+    List<ThumbnailFormat> initialServerThumbnailFormats, {
+    required bool animated,
+  }) {
+    return initialServerThumbnailFormats
+        .where((format) => format.animated == animated)
+        .toList()
+      ..sort(_compareThumbnailFormats);
+  }
+
+  /// A comparator to sort formats by max-width plus max-height, ascending.
+  static int _compareThumbnailFormats(ThumbnailFormat a, ThumbnailFormat b) {
+    final aValue = a.maxWidth + a.maxHeight;
+    final bValue = b.maxWidth + b.maxHeight;
+    return aValue.compareTo(bValue);
   }
 
   void handleCustomProfileFieldsEvent(CustomProfileFieldsEvent event) {

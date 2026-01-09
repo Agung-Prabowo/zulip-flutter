@@ -19,6 +19,9 @@ void main() {
           case UserSettingName.twentyFourHourTime:
             newSettings[name] = TwentyFourHourTimeMode.twelveHour;
             expectedBodyFields['twenty_four_hour_time'] = 'false';
+          case UserSettingName.starredMessageCounts:
+            newSettings[name] = false;
+            expectedBodyFields['starred_message_counts'] = 'false';
           case UserSettingName.displayEmojiReactionUsers:
             newSettings[name] = false;
             expectedBodyFields['display_emoji_reaction_users'] = 'false';
@@ -45,8 +48,14 @@ void main() {
 
       // TODO(server-future) instead, check for twenty_four_hour_time: null
       //   (could be an error-prone part of the JSONification)
-      check(() => updateSettings(connection,
-        newSettings: {UserSettingName.twentyFourHourTime: TwentyFourHourTimeMode.localeDefault})
+      check(
+        () => updateSettings(
+          connection,
+          newSettings: {
+            UserSettingName.twentyFourHourTime:
+                TwentyFourHourTimeMode.localeDefault,
+          },
+        ),
       ).throws<AssertionError>();
     });
   });

@@ -71,6 +71,7 @@ void main() {
     List<int>? mutedUserIds,
     List<Subscription>? subscriptions,
     UnreadMessagesSnapshot? unreadMsgs,
+    List<int>? starredMessages,
     int? zulipFeatureLevel,
     List<NavigatorObserver> navObservers = const [],
     bool skipAssertAccountExists = false,
@@ -84,7 +85,10 @@ void main() {
     final selfAccount = eg.selfAccount.copyWith(zulipFeatureLevel: zulipFeatureLevel);
     await testBinding.globalStore.add(selfAccount, eg.initialSnapshot(
       zulipFeatureLevel: zulipFeatureLevel,
-      streams: streams, subscriptions: subscriptions, unreadMsgs: unreadMsgs));
+      streams: streams,
+      subscriptions: subscriptions,
+      unreadMsgs: unreadMsgs,
+      starredMessages: starredMessages));
     store = await testBinding.globalStore.perAccount(selfAccount.id);
     connection = store.connection as FakeApiConnection;
 
@@ -165,11 +169,14 @@ void main() {
       // Regression test for: https://github.com/zulip/zulip-flutter/issues/1717
       final stream = eg.stream();
       // Open the page on a topic with the literal name "general chat".
-      final topic = eg.defaultRealmEmptyTopicDisplayName;
-      final topicNarrow = eg.topicNarrow(stream.streamId, topic);
+      final topicNarrow = eg.topicNarrow(
+        stream.streamId,
+        eg.defaultRealmEmptyTopicDisplayName);
+      final message = eg.streamMessage(
+        stream: stream, topic: '', content: "<p>a message</p>");
       await setupMessageListPage(tester, narrow: topicNarrow,
         subscriptions: [eg.subscription(stream)],
-        messages: [eg.streamMessage(stream: stream, topic: topic, content: "<p>a message</p>")]);
+        messages: [message]);
       final state = MessageListPage.ancestorOf(tester.element(find.text("a message")));
       // The page's narrow has been updated; the topic is "", not "general chat".
       check(state.narrow).equals(eg.topicNarrow(stream.streamId, ''));
@@ -240,7 +247,7 @@ void main() {
       await setupMessageListPage(tester,
         narrow: eg.topicNarrow(channel.streamId, ''),
         subscriptions: [eg.subscription(channel)],
-        messageCount: 1);
+        messages: [eg.streamMessage(stream: channel, topic: '')]);
       checkAppBarChannelTopic(
         channel.name, eg.defaultRealmEmptyTopicDisplayName);
     });
@@ -282,7 +289,8 @@ void main() {
       final channel = eg.stream();
       await setupMessageListPage(tester, narrow: eg.topicNarrow(channel.streamId, 'hi'),
         navObservers: [navObserver],
-        subscriptions: [eg.subscription(channel)], messageCount: 1);
+        subscriptions: [eg.subscription(channel)],
+        messages: [eg.streamMessage(stream: channel, topic: 'hi')]);
 
       // Clear out initial route.
       assert(pushedRoutes.length == 1);
@@ -302,8 +310,8 @@ void main() {
         subscriptions: [eg.subscription(channel)],
         messages: [eg.streamMessage(stream: channel, topic: 'topic foo')]);
 
-      connection.prepare(json: GetStreamTopicsResult(topics: [
-        eg.getStreamTopicsEntry(name: 'topic foo'),
+      connection.prepare(json: GetChannelTopicsResult(topics: [
+        eg.getChannelTopicsEntry(name: 'topic foo'),
       ]).toJson());
       await tester.tap(find.byIcon(ZulipIcons.topics));
       await tester.pump(); // tap the button
@@ -320,7 +328,7 @@ void main() {
       await setupMessageListPage(tester,
         narrow: eg.topicNarrow(channel.streamId, topic),
         streams: [channel], subscriptions: [eg.subscription(channel)],
-        messageCount: 1);
+        messages: [eg.streamMessage(stream: channel, topic: topic)]);
       await store.handleEvent(eg.userTopicEvent(
         channel.streamId, topic, UserTopicVisibilityPolicy.muted));
       await tester.pump();
@@ -337,8 +345,8 @@ void main() {
         subscriptions: [eg.subscription(channel)],
         messages: [eg.streamMessage(stream: channel, topic: 'topic foo')]);
 
-      connection.prepare(json: GetStreamTopicsResult(topics: [
-        eg.getStreamTopicsEntry(name: 'topic foo'),
+      connection.prepare(json: GetChannelTopicsResult(topics: [
+        eg.getChannelTopicsEntry(name: 'topic foo'),
       ]).toJson());
       await tester.tap(find.byIcon(ZulipIcons.topics));
       await tester.pump(); // tap the button
@@ -356,10 +364,10 @@ void main() {
       final mutedUsers = [1, 3];
 
       await setupMessageListPage(tester,
-        narrow: DmNarrow.withOtherUsers([1, 2, 3], selfUserId: 10),
+        narrow: DmNarrow.withOtherUsers([1, 2, 3], selfUserId: eg.selfUser.userId),
         users: [user1, user2, user3],
         mutedUserIds: mutedUsers,
-        messageCount: 1,
+        messages: [eg.dmMessage(from: user1, to: [user2, user3, eg.selfUser])],
       );
 
       check(find.text('DMs with Muted user, User 2, Muted user')).findsOne();
@@ -392,7 +400,7 @@ void main() {
         skipPumpAndSettle: true);
 
       // The topic input is autofocused, triggering topic autocomplete.
-      connection.prepare(json: GetStreamTopicsResult(topics: []).toJson());
+      connection.prepare(json: GetChannelTopicsResult(topics: []).toJson());
       await tester.pumpAndSettle();
 
       check(findPlaceholder).findsOne();
@@ -406,7 +414,7 @@ void main() {
         skipPumpAndSettle: true);
 
       // The topic input is autofocused, triggering topic autocomplete.
-      connection.prepare(json: GetStreamTopicsResult(topics: []).toJson());
+      connection.prepare(json: GetChannelTopicsResult(topics: []).toJson());
       await tester.pumpAndSettle();
 
       check(store.selfHasContentAccess(channel)).isFalse();
@@ -448,7 +456,7 @@ void main() {
         skipPumpAndSettle: true);
 
       // The topic input is autofocused, triggering topic autocomplete.
-      connection.prepare(json: GetStreamTopicsResult(topics: []).toJson());
+      connection.prepare(json: GetChannelTopicsResult(topics: []).toJson());
       await tester.pumpAndSettle();
 
       check(store.selfHasContentAccess(channel)).isFalse();
@@ -1211,6 +1219,48 @@ void main() {
       check(isMarkAsReadButtonVisible(tester)).isFalse();
     });
 
+    testWidgets('listens to Unreads model, not just PerAccountStore and MessageListView', (tester) async {
+      // Regression test for an edge case where the button wouldn't disappear
+      // when the narrow's unreads were cleared, because the button would only
+      // respond to notifications from PerAccountStore and MessageListView,
+      // not Unreads.
+      //
+      // For this test, there's one unread message in the narrow,
+      // and it's old enough that it hasn't been fetched yet.
+      // We simulate an event that removes the message from the narrow,
+      // thus causing Unreads but not MessageListView or PerAccountStore
+      // to notify listeners.
+      // And we check that the button responds by disappearing.
+
+      final message = eg.streamMessage(id: 100, flags: [MessageFlag.mentioned]);
+      final unreadMsgs = eg.unreadMsgs(
+        channels: [
+          UnreadChannelSnapshot(
+            topic: message.topic,
+            streamId: message.streamId,
+            unreadMessageIds: [message.id],
+          ),
+        ],
+        mentions: [message.id],
+      );
+      await setupMessageListPage(tester,
+        narrow: MentionsNarrow(),
+        unreadMsgs: unreadMsgs,
+        // omit `message`; if present, MessageListView would notify listeners
+        messages: List.generate(300, (i) =>
+          eg.streamMessage(id: 950 + i, sender: eg.selfUser,
+            flags: [MessageFlag.read, MessageFlag.mentioned])),
+        foundOldest: false);
+      check(isMarkAsReadButtonVisible(tester)).isTrue();
+
+      // The message no longer has an @-mention.
+      // It was the only unread message with an @-mention,
+      // so the button should disappear.
+      await store.handleEvent(eg.updateMessageEditEvent(message, flags: []));
+      await tester.pumpAndSettle();
+      check(isMarkAsReadButtonVisible(tester)).isFalse();
+    });
+
     testWidgets("messages don't shift position", (tester) async {
       final message = eg.streamMessage(flags: []);
       final unreadMsgs = eg.unreadMsgs(channels:[
@@ -1400,9 +1450,9 @@ void main() {
     final otherSubscription = eg.subscription(otherChannel);
     final narrow = eg.topicNarrow(channel.streamId, topic);
 
-    void prepareGetMessageResponse(List<Message> messages) {
+    void prepareGetMessageResponse(List<Message> messages, {bool foundOldest = false}) {
       connection.prepare(json: eg.newestGetMessagesResult(
-        foundOldest: false, messages: messages).toJson());
+        foundOldest: foundOldest, messages: messages).toJson());
     }
 
     Future<void> handleMessageMoveEvent(List<StreamMessage> messages, String newTopic, {int? newChannelId}) async {
@@ -1463,10 +1513,23 @@ void main() {
       check(find.textContaining('Existing message').evaluate()).length.equals(0);
       check(find.textContaining('Message to move').evaluate()).length.equals(1);
 
+      final newChannel = eg.stream();
       final existingMessage = eg.streamMessage(
-        stream: eg.stream(), topic: 'new topic', content: 'Existing message');
-      prepareGetMessageResponse([existingMessage, message]);
-      await handleMessageMoveEvent([message], 'new topic');
+        stream: newChannel, topic: 'new topic', content: 'Existing message');
+      prepareGetMessageResponse(
+        // `foundOldest: true` just to avoid having to prepare a fetch-older
+        // response when a scroll-metrics notification occurs. (I don't really
+        // understand what causes that scroll-metrics notification, but it's not
+        // the focus of this test.)
+        foundOldest: true,
+        [
+          existingMessage,
+          Message.fromJson(deepToJson(message) as Map<String, dynamic>
+                             ..['stream_id'] = newChannel.streamId
+                             ..['subject'] = 'new topic'),
+        ]);
+      await handleMessageMoveEvent([message],
+        'new topic', newChannelId: newChannel.streamId);
       await tester.pump(const Duration(seconds: 1));
 
       check(find.textContaining('Existing message').evaluate()).length.equals(1);
@@ -2230,11 +2293,16 @@ void main() {
           final navObserver = TestNavigatorObserver()
             ..onPushed = ((route, prevRoute) => lastPushedRoute = route);
 
+          final messages = [message];
+
           await setupMessageListPage(
             tester,
             narrow: narrow,
-            messages: [message],
+            messages: messages,
             subscriptions: [subscription],
+            starredMessages: messages
+              .where((message) => message.flags.contains(MessageFlag.starred))
+              .map((message) => message.id).toList(),
             navObservers: [navObserver]
           );
           lastPushedRoute = null;
@@ -2274,9 +2342,9 @@ void main() {
       doTest(expected: false, ChannelNarrow(subscription.streamId),
         mkMessage: () => eg.streamMessage(stream: subscription));
       doTest(expected: false, TopicNarrow(subscription.streamId, eg.t(topic)),
-        mkMessage: () => eg.streamMessage(stream: subscription));
-      doTest(expected: false, DmNarrow.withUsers([], selfUserId: eg.selfUser.userId),
         mkMessage: () => eg.streamMessage(stream: subscription, topic: topic));
+      doTest(expected: false, DmNarrow.withUsers([], selfUserId: eg.selfUser.userId),
+        mkMessage: () => eg.dmMessage(from: eg.selfUser, to: []));
       doTest(expected: true, StarredMessagesNarrow(),
         mkMessage: () => eg.streamMessage(flags: [MessageFlag.starred]));
       doTest(expected: true, MentionsNarrow(),
@@ -2445,13 +2513,15 @@ void main() {
   group('Starred messages', () {
     testWidgets('unstarred message', (tester) async {
       final message = eg.streamMessage(flags: []);
-      await setupMessageListPage(tester, messages: [message]);
+      await setupMessageListPage(tester,
+        messages: [message], starredMessages: []);
       check(find.byIcon(ZulipIcons.star_filled).evaluate()).isEmpty();
     });
 
     testWidgets('starred message', (tester) async {
       final message = eg.streamMessage(flags: [MessageFlag.starred]);
-      await setupMessageListPage(tester, messages: [message]);
+      await setupMessageListPage(tester,
+        messages: [message], starredMessages: [message.id]);
       check(find.byIcon(ZulipIcons.star_filled).evaluate()).length.equals(1);
     });
   });

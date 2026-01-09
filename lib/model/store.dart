@@ -17,6 +17,7 @@ import '../api/route/events.dart';
 import '../api/backoff.dart';
 import '../api/route/realm.dart';
 import '../log.dart';
+import '../widgets/compose_box.dart';
 import 'actions.dart';
 import 'autocomplete.dart';
 import 'database.dart';
@@ -32,6 +33,7 @@ import 'server_support.dart';
 import 'channel.dart';
 import 'saved_snippet.dart';
 import 'settings.dart';
+import 'topics.dart';
 import 'typing_status.dart';
 import 'unreads.dart';
 import 'user.dart';
@@ -562,6 +564,7 @@ class PerAccountStore extends PerAccountStoreBase with
       emoji: EmojiStoreImpl(core: core,
         allRealmEmoji: initialSnapshot.realmEmoji),
       userSettings: initialSnapshot.userSettings,
+      hasZoomToken: initialSnapshot.hasZoomToken,
       pushDevices: PushDeviceManager(core: core),
       savedSnippets: SavedSnippetStoreImpl(core: core,
         savedSnippets: initialSnapshot.savedSnippets ?? []),
@@ -571,7 +574,9 @@ class PerAccountStore extends PerAccountStoreBase with
       presence: Presence(realm: realm,
         initial: initialSnapshot.presences),
       channels: channels,
-      messages: MessageStoreImpl(channels: channels),
+      topics: Topics(core: core),
+      messages: MessageStoreImpl(channels: channels,
+        initialStarredMessages: initialSnapshot.starredMessages),
       unreads: Unreads(core: core, channelStore: channels,
         initial: initialSnapshot.unreadMsgs),
       recentDmConversationsView: RecentDmConversationsView(core: core,
@@ -586,6 +591,7 @@ class PerAccountStore extends PerAccountStoreBase with
     required RealmStoreImpl realm,
     required EmojiStoreImpl emoji,
     required this.userSettings,
+    required this.hasZoomToken,
     required this.pushDevices,
     required SavedSnippetStoreImpl savedSnippets,
     required this.typingNotifier,
@@ -593,6 +599,7 @@ class PerAccountStore extends PerAccountStoreBase with
     required this.typingStatus,
     required this.presence,
     required ChannelStoreImpl channels,
+    required this.topics,
     required MessageStoreImpl messages,
     required this.unreads,
     required this.recentDmConversationsView,
@@ -658,6 +665,8 @@ class PerAccountStore extends PerAccountStoreBase with
 
   final UserSettings userSettings;
 
+  bool hasZoomToken;
+
   final PushDeviceManager pushDevices;
 
   @override
@@ -685,6 +694,8 @@ class PerAccountStore extends PerAccountStoreBase with
   @override
   ChannelStore get channelStore => _channels;
   final ChannelStoreImpl _channels;
+
+  final Topics topics;
 
   //|//////////////////////////////
   // Messages, and summaries of messages.
@@ -783,6 +794,8 @@ class PerAccountStore extends PerAccountStoreBase with
         switch (event.property!) {
           case UserSettingName.twentyFourHourTime:
             userSettings.twentyFourHourTime        = event.value as TwentyFourHourTimeMode;
+          case UserSettingName.starredMessageCounts:
+            userSettings.starredMessageCounts      = event.value as bool;
           case UserSettingName.displayEmojiReactionUsers:
             userSettings.displayEmojiReactionUsers = event.value as bool;
           case UserSettingName.emojiset:
@@ -791,6 +804,15 @@ class PerAccountStore extends PerAccountStoreBase with
             userSettings.presenceEnabled           = event.value as bool;
         }
         notifyListeners();
+
+      case HasZoomTokenEvent():
+        assert(debugLog("server event: has_zoom_token"));
+        final hasZoomTokenUpdated = event.value;
+        if (hasZoomToken != hasZoomTokenUpdated) {
+          hasZoomToken = hasZoomTokenUpdated;
+          if(hasZoomToken) await ComposeCall.handleHasZoomTokenEvent();
+          notifyListeners();
+        }
 
       case CustomProfileFieldsEvent():
         assert(debugLog("server event: custom_profile_fields"));
@@ -879,6 +901,7 @@ class PerAccountStore extends PerAccountStoreBase with
         unreads.handleMessageEvent(event);
         recentDmConversationsView.handleMessageEvent(event);
         recentSenders.handleMessage(event.message); // TODO(#824)
+        topics.handleMessageEvent(event);
         // When adding anything here (to handle [MessageEvent]),
         // it probably belongs in [reconcileMessages] too.
 
@@ -886,21 +909,26 @@ class PerAccountStore extends PerAccountStoreBase with
         assert(debugLog("server event: update_message ${event.messageId}"));
         _messages.handleUpdateMessageEvent(event);
         unreads.handleUpdateMessageEvent(event);
+        topics.handleUpdateMessageEvent(event);
 
       case DeleteMessageEvent():
         assert(debugLog("server event: delete_message ${event.messageIds}"));
+        bool shouldNotify = false;
         // This should be called before [_messages.handleDeleteMessageEvent(event)],
         // as we need to know about each message for [event.messageIds],
         // specifically, their `senderId`s. By calling this after the
         // aforementioned line, we'll lose reference to those messages.
         recentSenders.handleDeleteMessageEvent(event, messages);
-        _messages.handleDeleteMessageEvent(event);
+        shouldNotify |= _messages.handleDeleteMessageEvent(event);
         unreads.handleDeleteMessageEvent(event);
+        if (shouldNotify) notifyListeners();
 
       case UpdateMessageFlagsEvent():
         assert(debugLog("server event: update_message_flags/${event.op} ${event.flag.toJson()}"));
-        _messages.handleUpdateMessageFlagsEvent(event);
+        bool shouldNotify = false;
+        shouldNotify |= _messages.handleUpdateMessageFlagsEvent(event);
         unreads.handleUpdateMessageFlagsEvent(event);
+        if (shouldNotify) notifyListeners();
 
       case SubmessageEvent():
         assert(debugLog("server event: submessage ${event.content}"));

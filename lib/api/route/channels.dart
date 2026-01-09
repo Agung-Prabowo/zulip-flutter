@@ -9,17 +9,23 @@ part 'channels.g.dart';
 /// [subscriptions] is a list of channel names.
 /// (This is one of the few remaining areas where the Zulip API hasn't migrated
 /// to using IDs.)
-Future<void> subscribeToChannel(ApiConnection connection, {
+Future<void> subscribeToChannel(
+  ApiConnection connection, {
   // TODO(server-future): This should use a stream ID, not stream name.
   //   (Keep dartdoc up to date.)
   //   Server issue: https://github.com/zulip/zulip/issues/10744
   required List<String> subscriptions,
   List<int>? principals,
 }) {
-  return connection.post('subscribeToChannel', (_) {}, 'users/me/subscriptions', {
-    'subscriptions': subscriptions.map((name) => {'name': name}).toList(),
-    if (principals != null) 'principals': principals,
-  });
+  return connection.post(
+    'subscribeToChannel',
+    (_) {},
+    'users/me/subscriptions',
+    {
+      'subscriptions': subscriptions.map((name) => {'name': name}).toList(),
+      if (principals != null) 'principals': principals,
+    },
+  );
 }
 
 /// https://zulip.com/api/unsubscribe
@@ -27,64 +33,71 @@ Future<void> subscribeToChannel(ApiConnection connection, {
 /// [subscriptions] is a list of channel names.
 /// (This is one of the few remaining areas where the Zulip API hasn't migrated
 /// to using IDs.)
-Future<void> unsubscribeFromChannel(ApiConnection connection, {
+Future<void> unsubscribeFromChannel(
+  ApiConnection connection, {
   // TODO(server-future): This should use a stream ID, not stream name.
   //   (Keep dartdoc up to date.)
   //   Server issue: https://github.com/zulip/zulip/issues/10744
   required List<String> subscriptions,
   List<int>? principals,
 }) {
-  return connection.delete('unsubscribeFromChannel', (_) {}, 'users/me/subscriptions', {
-    'subscriptions': subscriptions,
-    if (principals != null) 'principals': principals,
-  });
+  return connection.delete(
+    'unsubscribeFromChannel',
+    (_) {},
+    'users/me/subscriptions',
+    {
+      'subscriptions': subscriptions,
+      if (principals != null) 'principals': principals,
+    },
+  );
 }
 
 /// https://zulip.com/api/get-stream-topics
-Future<GetStreamTopicsResult> getStreamTopics(ApiConnection connection, {
-  required int streamId,
+Future<GetChannelTopicsResult> getChannelTopics(
+  ApiConnection connection, {
+  required int channelId,
   required bool allowEmptyTopicName,
 }) {
   assert(allowEmptyTopicName, '`allowEmptyTopicName` should only be true');
-  return connection.get('getStreamTopics', GetStreamTopicsResult.fromJson, 'users/me/$streamId/topics', {
-    'allow_empty_topic_name': allowEmptyTopicName,
-  });
+  return connection.get(
+    'getChannelTopics',
+    GetChannelTopicsResult.fromJson,
+    'users/me/$channelId/topics',
+    {'allow_empty_topic_name': allowEmptyTopicName},
+  );
 }
 
 @JsonSerializable(fieldRename: FieldRename.snake)
-class GetStreamTopicsResult {
-  final List<GetStreamTopicsEntry> topics;
+class GetChannelTopicsResult {
+  final List<GetChannelTopicsEntry> topics;
 
-  GetStreamTopicsResult({
-    required this.topics,
-  });
+  GetChannelTopicsResult({required this.topics});
 
-  factory GetStreamTopicsResult.fromJson(Map<String, dynamic> json) =>
-    _$GetStreamTopicsResultFromJson(json);
+  factory GetChannelTopicsResult.fromJson(Map<String, dynamic> json) =>
+      _$GetChannelTopicsResultFromJson(json);
 
-  Map<String, dynamic> toJson() => _$GetStreamTopicsResultToJson(this);
+  Map<String, dynamic> toJson() => _$GetChannelTopicsResultToJson(this);
 }
 
 @JsonSerializable(fieldRename: FieldRename.snake)
-class GetStreamTopicsEntry {
+class GetChannelTopicsEntry {
   final int maxId;
   final TopicName name;
 
-  GetStreamTopicsEntry({
-    required this.maxId,
-    required this.name,
-  });
+  GetChannelTopicsEntry({required this.maxId, required this.name});
 
-  factory GetStreamTopicsEntry.fromJson(Map<String, dynamic> json) => _$GetStreamTopicsEntryFromJson(json);
+  factory GetChannelTopicsEntry.fromJson(Map<String, dynamic> json) =>
+      _$GetChannelTopicsEntryFromJson(json);
 
-  Map<String, dynamic> toJson() => _$GetStreamTopicsEntryToJson(this);
+  Map<String, dynamic> toJson() => _$GetChannelTopicsEntryToJson(this);
 }
 
 /// Update a topic's visibility policy.
 ///
 /// This encapsulates a server-feature check.
 // TODO(server-7): remove this and just use updateUserTopic
-Future<void> updateUserTopicCompat(ApiConnection connection, {
+Future<void> updateUserTopicCompat(
+  ApiConnection connection, {
   required int streamId,
   required TopicName topic,
   required UserTopicVisibilityPolicy visibilityPolicy,
@@ -97,16 +110,19 @@ Future<void> updateUserTopicCompat(ApiConnection connection, {
       _ => throw UnsupportedError('$visibilityPolicy on old server'),
     };
     // https://zulip.com/api/mute-topic
-    return connection.patch('muteTopic', (_) {}, 'users/me/subscriptions/muted_topics', {
-      'stream_id': streamId,
-      'topic': RawParameter(topic.apiName),
-      'op': RawParameter(op),
-    });
+    return connection
+        .patch('muteTopic', (_) {}, 'users/me/subscriptions/muted_topics', {
+          'stream_id': streamId,
+          'topic': RawParameter(topic.apiName),
+          'op': RawParameter(op),
+        });
   } else {
-    return updateUserTopic(connection,
+    return updateUserTopic(
+      connection,
       streamId: streamId,
       topic: topic,
-      visibilityPolicy: visibilityPolicy);
+      visibilityPolicy: visibilityPolicy,
+    );
   }
 }
 
@@ -114,7 +130,8 @@ Future<void> updateUserTopicCompat(ApiConnection connection, {
 ///
 /// This binding only supports feature levels 170+.
 // TODO(server-7) remove FL 170+ mention in doc, and the related `assert`
-Future<void> updateUserTopic(ApiConnection connection, {
+Future<void> updateUserTopic(
+  ApiConnection connection, {
   required int streamId,
   required TopicName topic,
   required UserTopicVisibilityPolicy visibilityPolicy,
