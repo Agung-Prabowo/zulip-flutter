@@ -4,13 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import '../generated/l10n/zulip_localizations.dart';
+import '../model/actions.dart';
 import '../model/narrow.dart';
-import 'about_zulip.dart';
 import 'action_sheet.dart';
 import 'app.dart';
 import 'app_bar.dart';
 import 'button.dart';
 import 'color.dart';
+import 'counter_badge.dart';
 import 'icons.dart';
 import 'image.dart';
 import 'inbox.dart';
@@ -24,7 +25,6 @@ import 'store.dart';
 import 'subscription_list.dart';
 import 'text.dart';
 import 'theme.dart';
-import 'counter_badge.dart';
 import 'user.dart';
 
 enum _HomePageTab { inbox, channels, directMessages }
@@ -447,9 +447,10 @@ class _MainMenu extends StatelessWidget {
       // TODO(#198): Set my status
       // const SizedBox(height: 8),
       const _SettingsButton(),
+      const _LogoutButton(),
       // TODO(#661): Notifications
       // const SizedBox(height: 8),
-      const _AboutZulipButton(),
+      // const _AboutZulipButton(),
       // TODO(#1095): VersionInfo
     ];
 
@@ -520,11 +521,11 @@ class _MainMenuHeaderState extends State<_MainMenuHeader> {
     return Tooltip(
       message: zulipLocalizations.switchAccountButtonTooltip,
       child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => _handleSwitchAccount(context),
-        onTapDown: (_) => _setIsPressed(true),
-        onTapUp: (_) => _setIsPressed(false),
-        onTapCancel: () => _setIsPressed(false),
+        // behavior: HitTestBehavior.opaque,
+        // onTap: () => _handleSwitchAccount(context),
+        // onTapDown: (_) => _setIsPressed(true),
+        // onTapUp: (_) => _setIsPressed(false),
+        // onTapCancel: () => _setIsPressed(false),
         child: AnimatedOpacity(
           opacity: _isPressed ? 0.5 : 1,
           duration: const Duration(milliseconds: 100),
@@ -566,11 +567,11 @@ class _MainMenuHeaderState extends State<_MainMenuHeader> {
                     ),
                   ),
                 ),
-                Icon(
-                  ZulipIcons.arrow_left_right,
-                  color: designVariables.icon,
-                  size: 24,
-                ),
+                // Icon(
+                //   ZulipIcons.arrow_left_right,
+                //   color: designVariables.icon,
+                //   size: 24,
+                // ),
               ],
             ),
           ),
@@ -949,19 +950,21 @@ class _SettingsButton extends MenuButton {
   }
 }
 
-class _AboutZulipButton extends MenuButton {
-  const _AboutZulipButton();
+class _LogoutButton extends MenuButton {
+  const _LogoutButton();
 
   @override
-  IconData get icon => ZulipIcons.info;
+  IconData get icon => Icons.logout;
 
   @override
   String label(ZulipLocalizations zulipLocalizations) {
-    return zulipLocalizations.aboutPageTitle;
+    return zulipLocalizations.logOutConfirmationDialogConfirmButton;
   }
 
   @override
-  void onPressed(BuildContext context) {
-    Navigator.of(context).push(AboutZulipPage.buildRoute(context));
+  void onPressed(BuildContext context) async {
+    final globalStore = GlobalStoreWidget.of(context);
+    final accountId = globalStore.accountIds.first;
+    unawaited(logOutAccount(GlobalStoreWidget.of(context), accountId));
   }
 }
