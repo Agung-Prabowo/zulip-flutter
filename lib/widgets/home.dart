@@ -328,8 +328,8 @@ class _NavigationBarButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final designVariables = DesignVariables.of(context);
     final color = selected
-        ? designVariables.iconSelected
-        : designVariables.icon;
+        ? designVariables.icon
+        : designVariables.iconSelected;
 
     Widget result = AnimatedScaleOnTap(
       scaleEnd: 0.875,
