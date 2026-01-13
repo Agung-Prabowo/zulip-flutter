@@ -49,7 +49,7 @@ class MessageListTheme extends ThemeExtension<MessageListTheme> {
     //   https://chat.zulip.org/#narrow/stream/243-mobile-team/topic/flutter.3A.20unread.20marker/near/1658008
     // (Web uses a left-to-right gradient from hsl(217deg 64% 59%) to transparent,
     // in both light and dark theme.)
-    unreadMarker: const HSLColor.fromAHSL(1, 227, 0.78, 0.59).toColor(),
+    unreadMarker: const HSLColor.fromAHSL(1, 179, 0.76, 0.33).toColor(),
 
     unreadMarkerGap: Colors.white.withValues(alpha: 0.6),
   );
