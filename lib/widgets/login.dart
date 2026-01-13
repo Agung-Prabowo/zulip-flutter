@@ -692,3 +692,84 @@ class _AlternativeAuthDivider extends StatelessWidget {
         ])));
   }
 }
+
+class Splash extends StatefulWidget {
+  const Splash({super.key});
+
+  @override
+  State<Splash> createState() => _SplashState();
+}
+
+class _SplashState extends State<Splash> {
+  final url = Uri.parse('https://meet.uripgumulya.com');
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _getServerSettings();
+  }
+
+  void _getServerSettings() async {
+    final zulipLocalizations = ZulipLocalizations.of(context);
+    try {
+      final GetServerSettingsResult serverSettings;
+      try {
+        final globalStore = GlobalStoreWidget.of(context);
+        final connection = globalStore.apiConnection(realmUrl: url, zulipFeatureLevel: null);
+        try {
+          serverSettings = await getServerSettings(connection);
+          final zulipVersionData = ZulipVersionData.fromServerSettings(serverSettings);
+          if (zulipVersionData.isUnsupported) {
+            throw ServerVersionUnsupportedException(zulipVersionData);
+          }
+        } on MalformedServerResponseException catch (e) {
+          final zulipVersionData = ZulipVersionData.fromMalformedServerResponseException(e);
+          if (zulipVersionData != null && zulipVersionData.isUnsupported) {
+            throw ServerVersionUnsupportedException(zulipVersionData);
+          }
+          rethrow;
+        } finally {
+          connection.close();
+        }
+      } catch (e) {
+        if (!mounted) return;
+
+        String? message;
+        Uri? learnMoreButtonUrl;
+        switch (e) {
+          case ServerVersionUnsupportedException(:final data):
+            message = zulipLocalizations.errorServerVersionUnsupportedMessage(
+              url.toString(),
+              data.zulipVersion,
+              kMinSupportedZulipVersion);
+            learnMoreButtonUrl = kServerSupportDocUrl;
+          default:
+            // TODO(#105) give more helpful feedback; see `fetchServerSettings`
+            //   in zulip-mobile's src/message/fetchActions.js.
+            message = zulipLocalizations.errorLoginCouldNotConnect(url.toString());
+        }
+        showErrorDialog(context: context,
+          title: zulipLocalizations.errorCouldNotConnectTitle,
+          message: message,
+          learnMoreButtonUrl: learnMoreButtonUrl);
+        return;
+      }
+      if (!mounted) return;
+      unawaited(Navigator.pushReplacement(context,
+        LoginPage.buildRoute(serverSettings: serverSettings)));
+    } catch(e) {
+      debugPrint(e.toString());
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Center(
+        child: Image.asset('assets/images/icon-ug.png'),
+      ),
+    );
+  }
+
+}

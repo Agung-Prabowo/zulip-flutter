@@ -121,6 +121,7 @@ flutter:
     - assets/Pygments/LICENSE.txt
     - assets/Source_Code_Pro/LICENSE.md
     - assets/Source_Sans_3/LICENSE.md
+    - assets/images/
 
   fonts:
     # KaTeX's custom fonts.

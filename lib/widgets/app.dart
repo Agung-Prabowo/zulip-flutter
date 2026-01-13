@@ -241,7 +241,7 @@ class _ZulipAppState extends State<ZulipApp> with WidgetsBindingObserver {
     return [
       if (lastVisitedAccountId == null)
         // There are no accounts, or the last-visited account was logged out.
-        MaterialWidgetRoute(page: const ChooseAccountPage())
+        MaterialWidgetRoute(page: const Splash())
       else
         HomePage.buildRoute(accountId: lastVisitedAccountId),
     ];
@@ -408,7 +408,7 @@ class _PreventEmptyStack extends NavigatorObserver {
     });
     if (isEmptyStack) {
       unawaited(
-        navigator.push(MaterialWidgetRoute(page: const ChooseAccountPage())),
+        navigator.push(MaterialWidgetRoute(page: const Splash())),
       );
     }
   }
