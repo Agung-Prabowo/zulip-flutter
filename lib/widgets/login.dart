@@ -367,8 +367,9 @@ class _LoginPageState extends State<LoginPage> {
 
       if (_otp == null) throw Error();
       final payload = WebAuthPayload.parse(url);
-      if (payload.realm.origin != widget.serverSettings.realmUrl.origin)
+      if (payload.realm.origin != widget.serverSettings.realmUrl.origin) {
         throw Error();
+      }
       final apiKey = payload.decodeApiKey(_otp!);
       await _tryInsertAccountAndNavigate(
         userId: payload.userId,
@@ -510,36 +511,36 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     assert(!PerAccountStoreWidget.debugExistsOf(context));
-    final colorScheme = Theme.of(context).colorScheme;
-    final zulipLocalizations = ZulipLocalizations.of(context);
+    // final colorScheme = Theme.of(context).colorScheme;
+    // final zulipLocalizations = ZulipLocalizations.of(context);
 
-    final externalAuthenticationMethods =
-        widget.serverSettings.externalAuthenticationMethods;
+    // final externalAuthenticationMethods =
+    //     widget.serverSettings.externalAuthenticationMethods;
 
     final loginContent = Column(
       children: [
         _UsernamePasswordForm(loginPageState: this),
-        if (externalAuthenticationMethods.isNotEmpty) ...[
-          _AlternativeAuthDivider(),
-          ...externalAuthenticationMethods.map((method) {
-            final icon = method.displayIcon;
-            return OutlinedButton.icon(
-              style: ButtonStyle(
-                backgroundColor: WidgetStatePropertyAll(
-                  colorScheme.secondaryContainer,
-                ),
-                foregroundColor: WidgetStatePropertyAll(
-                  colorScheme.onSecondaryContainer,
-                ),
-              ),
-              icon: icon != null
-                  ? Image.network(icon, width: 24, height: 24)
-                  : null,
-              onPressed: !_inProgress ? () => _beginWebAuth(method) : null,
-              label: Text(zulipLocalizations.signInWithFoo(method.displayName)),
-            );
-          }),
-        ],
+        // if (externalAuthenticationMethods.isNotEmpty) ...[
+        //   _AlternativeAuthDivider(),
+        //   ...externalAuthenticationMethods.map((method) {
+        //     final icon = method.displayIcon;
+        //     return OutlinedButton.icon(
+        //       style: ButtonStyle(
+        //         backgroundColor: WidgetStatePropertyAll(
+        //           colorScheme.secondaryContainer,
+        //         ),
+        //         foregroundColor: WidgetStatePropertyAll(
+        //           colorScheme.onSecondaryContainer,
+        //         ),
+        //       ),
+        //       icon: icon != null
+        //           ? Image.network(icon, width: 24, height: 24)
+        //           : null,
+        //       onPressed: !_inProgress ? () => _beginWebAuth(method) : null,
+        //       label: Text(zulipLocalizations.signInWithFoo(method.displayName)),
+        //     );
+        //   }),
+        // ],
       ],
     );
 
@@ -556,9 +557,7 @@ class _LoginPageState extends State<LoginPage> {
             flexibleSpace: FlexibleSpaceBar(
               background: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Center(
-                  child: Image.asset('assets/images/logo-ug.png'),
-                ),
+                child: Center(child: Image.asset('assets/images/logo-ug.png')),
               ),
             ),
           ),
@@ -574,7 +573,7 @@ class _LoginPageState extends State<LoginPage> {
                   vertical: 30,
                 ),
                 decoration: const BoxDecoration(color: Colors.white),
-                child: loginContent
+                child: loginContent,
               ),
             ),
           ),
