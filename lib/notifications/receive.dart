@@ -12,7 +12,8 @@ import 'open.dart';
 
 @pragma('vm:entry-point')
 class NotificationService {
-  static NotificationService get instance => (_instance ??= NotificationService._());
+  static NotificationService get instance =>
+      (_instance ??= NotificationService._());
   static NotificationService? _instance;
 
   NotificationService._();
@@ -56,13 +57,16 @@ class NotificationService {
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         await ZulipBinding.instance.firebaseInitializeApp(
-          options: kFirebaseOptionsAndroid);
+          options: kFirebaseOptionsAndroid,
+        );
 
         await NotificationDisplayManager.init();
-        ZulipBinding.instance.firebaseMessagingOnMessage
-          .listen(_onForegroundMessage);
+        ZulipBinding.instance.firebaseMessagingOnMessage.listen(
+          _onForegroundMessage,
+        );
         ZulipBinding.instance.firebaseMessagingOnBackgroundMessage(
-          _onBackgroundMessage);
+          _onBackgroundMessage,
+        );
 
         await _requestPermission(); // TODO(#324): defer if not logged into any accounts
         // On Android, the notification permission is only about showing
@@ -74,15 +78,17 @@ class NotificationService {
 
         // Get the FCM registration token, now and upon changes.  See FCM API docs:
         //   https://firebase.google.com/docs/cloud-messaging/android/client#sample-register
-        ZulipBinding.instance.firebaseMessaging.onTokenRefresh
-          .listen(_onTokenRefresh);
+        ZulipBinding.instance.firebaseMessaging.onTokenRefresh.listen(
+          _onTokenRefresh,
+        );
         await _getFcmToken();
 
       case TargetPlatform.iOS: // TODO(#324): defer requesting notif permission
         await NotificationOpenService.instance.start();
 
         await ZulipBinding.instance.firebaseInitializeApp(
-          options: kFirebaseOptionsIos);
+          options: kFirebaseOptionsIos,
+        );
 
         if (!await _requestPermission()) {
           // TODO(#324): request only "provisional" permission at this stage:
@@ -92,7 +98,7 @@ class NotificationService {
         }
 
         await _getApnsToken();
-        // TODO does iOS need token refresh too?
+      // TODO does iOS need token refresh too?
 
       case TargetPlatform.linux:
       case TargetPlatform.macOS:
@@ -106,7 +112,7 @@ class NotificationService {
   Future<bool> _requestPermission() async {
     // Docs on this API: https://firebase.flutter.dev/docs/messaging/permissions/
     final settings = await ZulipBinding.instance.firebaseMessaging
-      .requestPermission();
+        .requestPermission();
     assert(debugLog('notif authorization: ${settings.authorizationStatus}'));
     switch (settings.authorizationStatus) {
       case AuthorizationStatus.denied:
@@ -157,9 +163,11 @@ class NotificationService {
 
       case TargetPlatform.iOS:
         final packageInfo = await ZulipBinding.instance.packageInfo;
-        await addApnsToken(connection,
+        await addApnsToken(
+          connection,
           token: token,
-          appid: packageInfo!.packageName);
+          appid: packageInfo!.packageName,
+        );
 
       case TargetPlatform.linux:
       case TargetPlatform.macOS:
@@ -169,7 +177,10 @@ class NotificationService {
     }
   }
 
-  static Future<void> unregisterToken(ApiConnection connection, {required String token}) async {
+  static Future<void> unregisterToken(
+    ApiConnection connection, {
+    required String token,
+  }) async {
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         await removeFcmToken(connection, token: token);
@@ -196,7 +207,9 @@ class NotificationService {
   //   https://github.com/firebase/flutterfire/issues/9446#issuecomment-1240554285
   //   https://github.com/zulip/zulip-flutter/issues/528#issuecomment-1960646800
   @pragma('vm:entry-point')
-  static Future<void> _onBackgroundMessage(FirebaseRemoteMessage message) async {
+  static Future<void> _onBackgroundMessage(
+    FirebaseRemoteMessage message,
+  ) async {
     // This callback will run in a separate isolate from the rest of the app.
     // See docs:
     //   https://firebase.flutter.dev/docs/messaging/usage/#background-messages
