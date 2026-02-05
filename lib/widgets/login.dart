@@ -812,7 +812,7 @@ class Splash extends StatefulWidget {
 }
 
 class _SplashState extends State<Splash> {
-  final url = Uri.parse('https://meet.uripgumulya.com');
+  final url = Uri.parse('https://bleariest-krissy-monic.ngrok-free.dev');
 
   @override
   void didChangeDependencies() {
