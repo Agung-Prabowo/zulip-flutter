@@ -572,7 +572,7 @@ class _LoginPageState extends State<LoginPage> {
                   horizontal: 25,
                   vertical: 30,
                 ),
-                decoration: const BoxDecoration(color: Colors.white),
+                color: DesignVariables.of(context).mainBackground,
                 child: loginContent,
               ),
             ),
@@ -812,7 +812,7 @@ class Splash extends StatefulWidget {
 }
 
 class _SplashState extends State<Splash> {
-  final url = Uri.parse('https://bleariest-krissy-monic.ngrok-free.dev');
+  final url = Uri.parse('https://meet.uripgumulya.com');
 
   @override
   void didChangeDependencies() {
