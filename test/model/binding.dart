@@ -496,7 +496,8 @@ class FakeFirebaseMessaging extends Fake implements FirebaseMessaging {
     StreamController<String>.broadcast();
 
   @override
-  Future<String?> getToken({String? vapidKey}) async {
+  Future<String?> getToken({String? serviceWorkerScriptPath, String? vapidKey}) async {
+    assert(serviceWorkerScriptPath == null);
     assert(vapidKey == null);
     if (_token == null) {
       assert(_initialToken != null,
